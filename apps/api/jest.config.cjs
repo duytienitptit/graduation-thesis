@@ -2,6 +2,7 @@
 module.exports = {
   testEnvironment: 'node',
   rootDir: 'src',
+  setupFiles: ['<rootDir>/../jest.setup.cjs'],
   testRegex: '.*\\.spec\\.ts$',
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' },

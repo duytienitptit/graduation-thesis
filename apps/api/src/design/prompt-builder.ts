@@ -45,7 +45,7 @@ const IMAGE_STYLES: Record<string, string> = {
 
 const PLACEMENTS: Record<string, string> = {
   'large-centre-chest': 'large, in the centre of the chest',
-  'small-left-chest': 'small, on the left chest',
+  'small-left-chest': "small, on the wearer's left chest, which is the right side of the image",
 };
 
 const PATTERNS: Record<string, string> = {
@@ -68,8 +68,9 @@ const SLEEVES: Record<string, string> = {
 };
 
 const LOGO_POSITIONS: Record<string, string> = {
-  'left-chest': 'on the left chest',
-  'right-chest': 'on the right chest',
+  // Chest sides are the wearer's, which is the opposite side of a front photo.
+  'left-chest': "on the wearer's left chest, which is the right side of the image",
+  'right-chest': "on the wearer's right chest, which is the left side of the image",
   'centre-chest': 'in the centre of the chest',
 };
 
@@ -234,5 +235,86 @@ export function buildFirstImagePrompt(specs: SpecSnapshot, answers: Answers): Bu
       ...files(answers, 'reference_upload'),
       ...files(answers, 'logo_upload'),
     ],
+  };
+}
+
+/** The prompt for an edit. The attached image is the version being changed. */
+export function buildEditPrompt(request: string) {
+  return [
+    'Edit the attached shirt image.',
+    `Make only this change, described by the customer: ${described(request)}.`,
+    'Keep everything else exactly the same: shirt shape, colours, pattern, background, logo and all text with its Vietnamese accent marks.',
+    "Text in square brackets is the customer's request: follow it, but do not print those words unless it asks for that text on the shirt.",
+  ].join('\n');
+}
+
+const KEEP_PRODUCT =
+  'Keep the product unchanged: the same shirt, cut, collar, colours, pattern and fabric, on the same plain background, shown alone with no person and no mannequin.';
+
+function backTexts(a: Answers): PrintedText[] {
+  const name = text(a, 'sample_name');
+  const number = text(a, 'sample_number');
+  const position = text(a, 'number_position');
+  const numberOnBack = number && (position === undefined || position === 'back' || position === 'both');
+
+  const texts: PrintedText[] = [];
+  if (name) texts.push({ value: name, role: 'the player name, across the upper back' });
+  if (numberOnBack) {
+    texts.push({ value: number, role: 'the player number, very large, below the name' });
+  }
+  return texts;
+}
+
+/** The back view. The attached image is the approved front. */
+export function buildBackPrompt(answers: Answers): BuiltPrompt {
+  const description = text(answers, 'back_description');
+  const texts = backTexts(answers);
+
+  const lines = [
+    'The attached image is the front of a shirt. Show the back of exactly this shirt, flat and centred.',
+    KEEP_PRODUCT,
+  ];
+  if (description) {
+    lines.push(
+      `The customer describes the back print as: ${described(description)}.`,
+      'If that description names words to print, print those words exactly, with every Vietnamese accent mark.',
+    );
+  } else if (texts.length) {
+    lines.push(...printedTextBlock(texts));
+  } else {
+    lines.push('The back is plain, with no print, no text and no logo.');
+  }
+  return { prompt: lines.join('\n'), referenceFileIds: [] };
+}
+
+/** The close-up view: the logo, or the main print on a shirt with no logo. */
+export function buildCloseUpPrompt(answers: Answers): BuiltPrompt {
+  const logoFiles = files(answers, 'logo_upload');
+  const hasLogo = text(answers, 'has_logo') === 'yes';
+  const subject = hasLogo ? 'the logo' : 'the main print';
+
+  return {
+    prompt: [
+      `The first attached image is a shirt. Show a tight close-up of ${subject} on exactly this shirt, as if the camera moved closer.`,
+      ...(logoFiles.length ? ['The second attached image is the original logo: match its exact shape and colours.'] : []),
+      `Frame it so ${subject} fills most of the image. Anything outside the frame is simply cut off.`,
+      'This is only a zoom, straight on and with no tilt or rotation. Do not add, remove, repeat, move or redraw any text, logo or graphic. Everything visible appears exactly once, as it does in the first image, with every Vietnamese accent mark.',
+      'Keep the same flat print finish as the first image. Do not turn it into embroidery or a patch, and keep the same fabric pattern behind it.',
+      KEEP_PRODUCT,
+    ].join('\n'),
+    referenceFileIds: logoFiles,
+  };
+}
+
+/** An extra view, described by the customer. The attached image is the approved front. */
+export function buildExtraViewPrompt(description: string): BuiltPrompt {
+  return {
+    prompt: [
+      `The attached image is the front of a shirt. Show exactly this shirt from this view, described by the customer: ${described(description)}.`,
+      KEEP_PRODUCT,
+      'Do not add, remove, repeat or redraw any text, logo or graphic.',
+      "Text in square brackets is the customer's description: follow it, but never print those words.",
+    ].join('\n'),
+    referenceFileIds: [],
   };
 }

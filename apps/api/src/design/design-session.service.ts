@@ -93,7 +93,7 @@ export class DesignSessionService {
     return this.getOwn(customer, id);
   }
 
-  private async getOwn(customer: AuthUser, id: string) {
+  async getOwn(customer: AuthUser, id: string) {
     const session = await this.prisma.designSession.findUnique({ where: { id } });
     if (!session) throw new NotFoundException();
     if (session.customerId !== customer.id) throw new ForbiddenException();

@@ -19,6 +19,11 @@ export interface UploadTicket {
   expiresIn: number;
 }
 
+export interface StoredImage {
+  mimeType: string;
+  data: Buffer;
+}
+
 export interface DownloadLink {
   url: string;
   expiresIn: number;
@@ -32,6 +37,10 @@ export abstract class FilesPort {
   abstract createUpload(user: AuthUser, input: CreateUploadInput): Promise<UploadTicket>;
   abstract completeUpload(user: AuthUser, fileId: string): Promise<void>;
   abstract getDownloadLink(user: AuthUser, fileId: string): Promise<DownloadLink>;
+  /** Stores an image the backend made, such as an AI result. */
+  abstract saveImage(ownerId: string, image: StoredImage): Promise<string>;
+  /** Reads a file for the backend. Callers check permission first. */
+  abstract readImage(fileId: string): Promise<StoredImage>;
   /** True when every file is fully uploaded and belongs to this user. */
   abstract ownsReadyFiles(user: AuthUser, fileIds: string[]): Promise<boolean>;
 }

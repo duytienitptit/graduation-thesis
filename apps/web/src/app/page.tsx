@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AppHeader } from '@/components/app-header';
 import { ErrorNote } from '@/components/error-note';
@@ -10,13 +11,21 @@ import { useUser } from '@/lib/use-user';
 
 const STATUS_LABELS: Record<DesignSession['status'], string> = {
   ANSWERING: 'Đang trả lời câu hỏi',
-  ANSWERED: 'Đã trả lời xong',
+  ANSWERED: 'Đang thiết kế',
+  VIEWS: 'Đang duyệt các góc',
+  LOCKED: 'Đã chốt sản phẩm',
+  DESIGNER: 'Đang làm với designer',
 };
 
 export default function HomePage() {
+  const router = useRouter();
   const { user, error: userError } = useUser();
   const [sessions, setSessions] = useState<DesignSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.role === 'DESIGNER') router.replace('/designer');
+  }, [router, user]);
 
   useEffect(() => {
     if (user?.role !== 'CUSTOMER') return;
@@ -32,7 +41,7 @@ export default function HomePage() {
       <main className="mt-10">
         {userError && <ErrorNote>{userError}</ErrorNote>}
 
-        {user && user.role !== 'CUSTOMER' && (
+        {user?.role === 'MANAGER' && (
           <p className="text-muted-foreground">Khu vực dành cho vai trò của bạn chưa được mở.</p>
         )}
 

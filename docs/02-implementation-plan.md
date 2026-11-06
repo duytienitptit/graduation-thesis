@@ -41,12 +41,14 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ### ✅ Phase 0 — Nano Banana trial (throwaway)
 Done 2026-11-06. The owner chose **Nano Banana 2** (`gemini-3.1-flash-image`), with a Google AI Studio key and billing on (the free tier allows 0 image requests).
 
-Findings from one run per shirt type (`trial/run.mts`, images in the git-ignored `trial/output/`):
+Findings from one run per shirt type (images in the git-ignored `trial/output/`; the throwaway script was removed after phase 4):
 - Views keep one product, and Vietnamese text is correct once each text is listed with its spelling.
 - Descriptions in [square brackets] are drawn, not printed.
 - Nano Banana (`gemini-2.5-flash-image`) with the earlier prompt lost accents in small text.
-- The close-up of the printed shirt added a second line of text, which breaks "same product". Fix in phase 4; cropping the front image is an option to put to the owner.
+- The close-up of the printed shirt added a second line of text, which breaks "same product". The owner chose to keep AI redrawing the close-up (2026-11-06), with a stricter prompt in phase 4.
 - Open prompt tuning: stripes come out tone on tone, and close-ups should frame the logo more tightly.
+- Open: a white collar did not carry to the back on one real run, and one logo close-up came out tilted; the customer rejects and regenerates those.
+- Open: the model puts the logo on the right of the image even when the wearer's right chest is chosen, and an edit asking to move it did nothing. Exact placement stays in the handover data.
 
 ### ✅ Phase 1 — Project skeleton
 - Repo, workspace, Docker Compose, Prisma, base API and web app.
@@ -80,41 +82,71 @@ Steps (the owner reviews each one before the next):
 
 **Done when:** a customer answers the questions and a session stores them; prompt builder is unit-tested per shirt type.
 
-### 🟨 Phase 3 — AI image creation
+### ✅ Phase 3 — AI image creation
 - `ImageProvider` interface, fake and Nano Banana providers, called only from the backend.
 - BullMQ job with retries, job records with result, error and cost.
 - Versions, edit box, version history, daily limit of 20, live status over Socket.IO.
 
 Steps (the owner reviews each one before the next):
-- ⬜ 3.1 `ImageProvider` interface, fake provider, Nano Banana 2 provider, chosen by config
-- ⬜ 3.2 Backend file storage: save generated images, read customer uploads to send to the API
-- ⬜ 3.3 Design version and AI job tables
-- ⬜ 3.4 BullMQ queue and worker with retries, recording result, error, cost and duration
-- ⬜ 3.5 Create the first image from a session, with the daily limit of 20
-- ⬜ 3.6 Edit requests, new versions and version history
-- ⬜ 3.7 Live status over Socket.IO
-- ⬜ 3.8 Web: generating state, image, edit box, version history, limit message
-- ⬜ 3.9 Run the "Done when" check, with the fake provider and once with the real one
+- ✅ 3.1 `ImageProvider` interface, fake provider, Nano Banana 2 provider, chosen by config
+- ✅ 3.2 Backend file storage: save generated images, read customer uploads to send to the API
+- ✅ 3.3 Design version and AI job tables
+- ✅ 3.4 BullMQ queue and worker with retries, recording result, error, cost and duration
+- ✅ 3.5 Create the first image from a session, with the daily limit of 20
+- ✅ 3.6 Edit requests, new versions and version history
+- ✅ 3.7 Live status over Socket.IO
+- ✅ 3.8 Web: generating state, image, edit box, version history, limit message
+- ✅ 3.9 Run the "Done when" check, with the fake provider and once with the real one
 
 **Done when:** a customer creates and edits images end to end; a failed job reports to the customer and does not use up the limit; the limit is enforced.
 
-### ⬜ Phase 4 — Views and locking
+### ✅ Phase 4 — Views and locking
 - Mark the main image as the front view, generate the back and logo close-up.
 - Approve or regenerate each view alone, up to 2 extra views, lock when the 3 required views are approved.
 - Locked product read endpoint with images, answers and uploads.
 
+Steps (the owner reviews each one before the next):
+- ✅ 4.1 Product view table; the customer picks the OK image as the main front view
+- ✅ 4.2 Prompts for the back and close-up views, checked with real images
+- ✅ 4.3 Generate the back and close-up through the queue, counted against the limit
+- ✅ 4.4 Approve a view, or regenerate it alone without touching approved views
+- ✅ 4.5 Up to 2 extra views, chosen by typing what to show
+- ✅ 4.6 Lock the product once the 3 required views are approved
+- ✅ 4.7 Locked product read endpoint with images, answers and uploads
+- ✅ 4.8 Web: views screen, approval, extra views, lock button
+- ✅ 4.9 Run the "Done when" check, with the fake provider and once with the real one
+
 **Done when:** the full AI branch runs from questions to a locked product, with the fake provider in tests and the real one in a demo.
 
-### ⬜ Phase 5 — Tasks and dispatch
+### ✅ Phase 5 — Tasks and dispatch
 - Offer "continue with AI or need a designer?" once an AI image exists.
 - Task creation, queue, designer states (Free, Busy, Paused), working hours in Vietnam time.
 - Atomic claim, and dispatch on creation, at 9:00 and when a designer becomes free.
 
+Steps (the owner reviews each one before the next):
+- ✅ 5.1 Designer profiles with Free, Busy and Paused, and a second seeded designer
+- ✅ 5.2 Task table and task creation with requirements, the AI image and the answers
+- ✅ 5.3 While waiting for a designer, block AI edits in that session
+- ✅ 5.4 Working hours 9:00 to 17:00 Vietnam time, tested with a fixed clock
+- ✅ 5.5 Dispatch to free designers, oldest task first, behind a notice interface with a fake sender
+- ✅ 5.6 Dispatch triggers: on creation, at 9:00, and when a designer becomes free
+- ✅ 5.7 Atomic claim, with concurrent claims tested on real PostgreSQL
+- ✅ 5.8 Web: AI-or-designer choice, requirement form, "Finding a designer" state
+- ✅ 5.9 Run the "Done when" check
+
 **Done when:** a test runs concurrent claims against real PostgreSQL and exactly one wins; out-of-hours tasks wait until 9:00, tested with a fixed clock.
 
-### ⬜ Phase 6 — Telegram
+### ✅ Phase 6 — Telegram
 - Bot, one-time-code account linking, "Take task" messages sent through BullMQ with retries.
 - Button handling, rejection reasons, "already taken" edits to others' messages.
+
+Steps (the owner reviews each one before the next):
+- ✅ 6.1 Bot connection by long polling (owner's choice), chosen by config, with the fake sender kept for tests
+- ✅ 6.2 One-time-code account linking, with a link button in a small designer page
+- ✅ 6.3 "Take task" messages through BullMQ with retries, and message ids stored
+- ✅ 6.4 Button handling, using the atomic claim, with rejection reasons
+- ✅ 6.5 Change other designers' messages to "already taken"
+- 🟨 6.6 Check with 2 real linked accounts: deferred by the owner on 2026-11-06, who will run it later. A test covers it with real handlers, claim and PostgreSQL, and a fake Telegram. One real account has claimed a task; the second account and the real message edit are not verified.
 
 **Done when:** with 2 real linked Telegram accounts, the first press wins, the second is rejected, and messages update.
 
@@ -171,7 +203,6 @@ All features in the design are required. The owner decided on 2026-11-06 that no
 | Item | Needed by |
 |---|---|
 | OK on the project setup in section 2 | Given 2026-11-06 |
-| Telegram bot token from BotFather, plus 2 test accounts | Phase 6 |
 | Thesis deadline | Any time, to plan the pace |
 
 Keys go in a local `.env` file that is never committed.

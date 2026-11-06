@@ -26,6 +26,7 @@ export class ApiError extends Error {
     message: string,
     readonly status?: number,
     readonly answerErrors: AnswerError[] = [],
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -60,7 +61,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new ApiError(`Máy chủ từ chối yêu cầu (mã ${res.status}).`, res.status, body?.errors);
+    throw new ApiError(`Máy chủ từ chối yêu cầu (mã ${res.status}).`, res.status, body?.errors, body?.code);
   }
   return res.status === 204 ? (undefined as T) : res.json();
 }
@@ -91,9 +92,11 @@ export interface Product extends Option {
 
 export type Answers = Record<string, string | string[]>;
 
+export type SessionStatus = 'ANSWERING' | 'ANSWERED' | 'VIEWS' | 'LOCKED' | 'DESIGNER';
+
 export interface DesignSession {
   id: string;
-  status: 'ANSWERING' | 'ANSWERED';
+  status: SessionStatus;
   answers: Answers;
   createdAt: string;
   specSnapshot: {
@@ -151,6 +154,97 @@ export const submitAnswers = (id: string) =>
 
 export const getImageUrl = async (fileId: string) =>
   (await api<{ url: string }>(`/files/${fileId}/download-url`)).url;
+
+export interface DesignVersion {
+  id: string;
+  parentVersionId: string | null;
+  source: 'AI' | 'DESIGNER';
+  editRequest: string | null;
+  createdAt: string;
+  imageUrl: string;
+}
+
+export interface ProductView {
+  id: string;
+  type: 'FRONT' | 'BACK' | 'CLOSE_UP' | 'EXTRA';
+  position: number;
+  status: 'PENDING' | 'READY' | 'APPROVED';
+  description: string | null;
+  jobStatus: 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED' | null;
+  imageUrl: string | null;
+}
+
+export interface DesignTask {
+  id: string;
+  status: 'WAITING' | 'ASSIGNED';
+  requirement: string;
+  designerName: string | null;
+  waitReason: 'out-of-hours' | 'no-free-designer' | null;
+}
+
+export interface Workspace {
+  status: SessionStatus;
+  lockedProductId: string | null;
+  task: DesignTask | null;
+  views: ProductView[];
+  versions: DesignVersion[];
+  latestJob: {
+    id: string;
+    kind: 'CREATE' | 'EDIT';
+    status: 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED';
+  } | null;
+  usage: { used: number; limit: number; remaining: number; resetsAt: string };
+}
+
+export const getWorkspace = (id: string) => api<Workspace>(`/design/sessions/${id}/workspace`);
+
+export const createImage = (id: string) =>
+  api<{ id: string }>(`/design/sessions/${id}/images`, { method: 'POST' });
+
+export const editImage = (id: string, versionId: string, request: string) =>
+  api<{ id: string }>(`/design/sessions/${id}/edits`, {
+    method: 'POST',
+    body: JSON.stringify({ versionId, request }),
+  });
+
+export const createTask = (id: string, versionId: string, requirement: string) =>
+  api<unknown>(`/design/sessions/${id}/tasks`, {
+    method: 'POST',
+    body: JSON.stringify({ versionId, requirement }),
+  });
+
+export interface DesignerSummary {
+  state: 'FREE' | 'BUSY' | 'PAUSED';
+  telegramLinked: boolean;
+  telegramUsername: string | null;
+}
+
+export const getDesignerMe = () => api<DesignerSummary>('/designers/me');
+
+export const createTelegramLink = () =>
+  api<{ url: string; expiresAt: string }>('/designers/me/telegram-link', { method: 'POST' });
+
+export const chooseMainImage = (id: string, versionId: string) =>
+  api<unknown>(`/design/sessions/${id}/main-image`, {
+    method: 'POST',
+    body: JSON.stringify({ versionId }),
+  });
+
+const viewAction = (action: string) => (id: string, viewId: string) =>
+  api<unknown>(`/design/sessions/${id}/views/${viewId}/${action}`, { method: 'POST' });
+
+export const generateView = viewAction('generate');
+export const regenerateView = viewAction('regenerate');
+export const approveView = viewAction('approve');
+
+export const addExtraView = (id: string, description: string) =>
+  api<unknown>(`/design/sessions/${id}/views`, {
+    method: 'POST',
+    body: JSON.stringify({ description }),
+  });
+
+export const lockProduct = (id: string) =>
+  api<unknown>(`/design/sessions/${id}/lock`, { method: 'POST' });
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/png', 'image/jpeg'];

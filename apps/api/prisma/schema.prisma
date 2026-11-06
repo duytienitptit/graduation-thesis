@@ -24,6 +24,9 @@ model User {
 
   files          FileObject[]
   designSessions DesignSession[]
+  aiJobs         AiJob[]
+  designer       DesignerProfile?
+  tasks          Task[]
 }
 
 enum FilePurpose {
@@ -50,12 +53,17 @@ model FileObject {
   status     FileStatus  @default(PENDING)
   createdAt  DateTime    @default(now())
 
+  versions DesignVersion[]
+
   @@index([ownerId])
 }
 
 enum DesignSessionStatus {
   ANSWERING
   ANSWERED
+  VIEWS
+  LOCKED
+  DESIGNER
 }
 
 model DesignSession {
@@ -69,5 +77,199 @@ model DesignSession {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
+  versions DesignVersion[]
+  aiJobs   AiJob[]
+  views    ProductView[]
+  locked   LockedProduct?
+  tasks    Task[]
+
   @@index([customerId])
+}
+
+enum DesignVersionSource {
+  AI
+  DESIGNER
+}
+
+// One image in a session. AI and designer images share this list.
+model DesignVersion {
+  id              String              @id @default(uuid())
+  sessionId       String
+  session         DesignSession       @relation(fields: [sessionId], references: [id])
+  parentVersionId String?
+  parent          DesignVersion?      @relation("VersionParent", fields: [parentVersionId], references: [id])
+  children        DesignVersion[]     @relation("VersionParent")
+  fileId          String
+  file            FileObject          @relation(fields: [fileId], references: [id])
+  source          DesignVersionSource
+  prompt          String?
+  createdAt       DateTime            @default(now())
+
+  aiJob AiJob?
+  views ProductView[]
+  tasks Task[]
+
+  @@index([sessionId])
+}
+
+enum AiJobKind {
+  CREATE
+  EDIT
+  VIEW
+}
+
+enum AiJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+// One image request. Also the data behind Person 2's AI statistics.
+model AiJob {
+  id               String         @id @default(uuid())
+  sessionId        String
+  session          DesignSession  @relation(fields: [sessionId], references: [id])
+  customerId       String
+  customer         User           @relation(fields: [customerId], references: [id])
+  kind             AiJobKind
+  status           AiJobStatus    @default(QUEUED)
+  prompt           String
+  editRequest      String?
+  parentVersionId  String?
+  viewId           String?
+  view             ProductView?   @relation(fields: [viewId], references: [id])
+  /// Sent to the image API with the prompt, in order.
+  referenceFileIds String[]
+  versionId        String?        @unique
+  version          DesignVersion? @relation(fields: [versionId], references: [id])
+  model            String?
+  error            String?
+  costUsd          Decimal?       @db.Decimal(10, 4)
+  durationMs       Int?
+  attempts         Int            @default(0)
+  createdAt        DateTime       @default(now())
+  finishedAt       DateTime?
+
+  @@index([customerId, createdAt])
+  @@index([sessionId, status])
+  @@index([viewId])
+}
+
+enum ProductViewType {
+  FRONT
+  BACK
+  CLOSE_UP
+  EXTRA
+}
+
+enum ProductViewStatus {
+  PENDING
+  READY
+  APPROVED
+}
+
+// One angle of the product. Position separates the extra views; required views use 0.
+model ProductView {
+  id          String            @id @default(uuid())
+  sessionId   String
+  session     DesignSession     @relation(fields: [sessionId], references: [id])
+  type        ProductViewType
+  position    Int               @default(0)
+  versionId   String?
+  version     DesignVersion?    @relation(fields: [versionId], references: [id])
+  status      ProductViewStatus @default(PENDING)
+  /// What the customer typed for an extra view.
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  aiJobs AiJob[]
+
+  @@unique([sessionId, type, position])
+}
+
+// The handover to Person 1's review step, in one format for both branches.
+model LockedProduct {
+  id        String        @id @default(uuid())
+  sessionId String        @unique
+  session   DesignSession @relation(fields: [sessionId], references: [id])
+  lockedAt  DateTime      @default(now())
+}
+
+enum DesignerState {
+  FREE
+  BUSY
+  PAUSED
+}
+
+model DesignerProfile {
+  id        String        @id @default(uuid())
+  userId    String        @unique
+  user      User          @relation(fields: [userId], references: [id])
+  state     DesignerState @default(FREE)
+  /// Set once the designer links Telegram; notices go to this chat.
+  telegramChatId   String?  @unique
+  telegramUsername String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  tasks     Task[]
+  notices   TaskNotice[]
+  linkCodes TelegramLinkCode[]
+
+  @@index([state])
+}
+
+enum TaskStatus {
+  WAITING
+  ASSIGNED
+}
+
+model Task {
+  id                 String           @id @default(uuid())
+  sessionId          String
+  session            DesignSession    @relation(fields: [sessionId], references: [id])
+  customerId         String
+  customer           User             @relation(fields: [customerId], references: [id])
+  requirement        String
+  /// The AI image the customer was looking at. Answers come from the session.
+  referenceVersionId String
+  referenceVersion   DesignVersion    @relation(fields: [referenceVersionId], references: [id])
+  status             TaskStatus       @default(WAITING)
+  designerId         String?
+  designer           DesignerProfile? @relation(fields: [designerId], references: [id])
+  createdAt          DateTime         @default(now())
+  assignedAt         DateTime?
+
+  notices TaskNotice[]
+
+  @@index([status, createdAt])
+  @@index([sessionId])
+}
+
+// One message to one designer about one task, at most once per Vietnam day.
+model TaskNotice {
+  id         String          @id @default(uuid())
+  taskId     String
+  task       Task            @relation(fields: [taskId], references: [id])
+  designerId String
+  designer   DesignerProfile @relation(fields: [designerId], references: [id])
+  dayKey     String
+  externalId String?
+  sentAt     DateTime        @default(now())
+
+  @@unique([taskId, designerId, dayKey])
+}
+
+// A one-time code in a t.me link, proving which web account owns a Telegram chat.
+model TelegramLinkCode {
+  code       String          @id
+  designerId String
+  designer   DesignerProfile @relation(fields: [designerId], references: [id])
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([designerId])
 }

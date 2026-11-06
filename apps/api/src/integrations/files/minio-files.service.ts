@@ -26,6 +26,7 @@ import {
   DownloadLink,
   FilesPort,
   MAX_FILE_SIZE,
+  StoredImage,
   UploadTicket,
 } from './files.port.js';
 import { createS3Client } from './s3.client.js';
@@ -129,6 +130,44 @@ export class MinioFilesService extends FilesPort implements OnModuleInit, OnModu
       { expiresIn: DOWNLOAD_URL_SECONDS },
     );
     return { url, expiresIn: DOWNLOAD_URL_SECONDS };
+  }
+
+  async saveImage(ownerId: string, image: StoredImage) {
+    const id = randomUUID();
+    const extension = EXTENSIONS[image.mimeType] ?? 'bin';
+    const storageKey = `ai_image/${ownerId}/${id}.${extension}`;
+
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: storageKey,
+        Body: image.data,
+        ContentType: image.mimeType,
+      }),
+    );
+    await this.prisma.fileObject.create({
+      data: {
+        id,
+        ownerId,
+        storageKey,
+        mimeType: image.mimeType,
+        size: image.data.length,
+        purpose: 'AI_IMAGE',
+        status: 'READY',
+      },
+    });
+    return id;
+  }
+
+  async readImage(fileId: string): Promise<StoredImage> {
+    const file = await this.findFile(fileId);
+    const object = await this.s3.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: file.storageKey }),
+    );
+    return {
+      mimeType: file.mimeType,
+      data: Buffer.from(await object.Body!.transformToByteArray()),
+    };
   }
 
   async ownsReadyFiles(user: AuthUser, fileIds: string[]) {

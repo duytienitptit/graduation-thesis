@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppHeader } from '@/components/app-header';
+import { DesignStudio } from '@/components/design-studio';
 import { ErrorNote } from '@/components/error-note';
 import { QuestionField } from '@/components/question-field';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import {
   AnswerError,
   Answers,
   ApiError,
+  createImage,
   DesignSession,
   getQuestions,
   getSession,
@@ -104,7 +106,10 @@ export default function DesignSessionPage() {
     setPageError(null);
     try {
       await save();
-      setSession(await submitAnswers(id));
+      const submitted = await submitAnswers(id);
+      // The studio offers a button if this does not go through.
+      await createImage(id).catch(() => undefined);
+      setSession(submitted);
       setSaveState('idle');
       window.scrollTo({ top: 0 });
     } catch (e) {
@@ -123,10 +128,35 @@ export default function DesignSessionPage() {
   }
 
   const spec = session?.specSnapshot;
-  const answered = session?.status === 'ANSWERED';
+  const answered = !!session && session.status !== 'ANSWERING';
+  const logoQuestion = questions?.sections
+    .flatMap((section) => section.questions)
+    .find((question) => question.id === 'logo_position');
+  const logoPosition =
+    logoQuestion?.type === 'choice'
+      ? logoQuestion.options.find((option) => option.value === answers.logo_position)?.label
+      : undefined;
+
+  const answerForm = questions?.sections.map((section) => (
+    <section key={section.title} className="mt-12">
+      <h2 className="overprint text-3xl font-extrabold">{section.title}</h2>
+      {section.questions
+        .filter((question) => isVisible(question, answers))
+        .map((question) => (
+          <QuestionField
+            key={question.id}
+            question={question}
+            value={answers[question.id]}
+            error={errors.find((error) => error.questionId === question.id)?.code}
+            disabled={answered}
+            onChange={(value) => change(question.id, value)}
+          />
+        ))}
+    </section>
+  ));
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 pb-24 sm:px-8">
+    <div className="mx-auto max-w-4xl px-4 py-6 pb-24 sm:px-8">
       <AppHeader user={user} />
 
       <main className="mt-10">
@@ -141,33 +171,28 @@ export default function DesignSessionPage() {
             </p>
 
             {answered && (
-              <p role="status" className="mt-6 border-l-4 border-cobalt pl-3">
-                Bạn đã gửi câu trả lời. Các câu trả lời bên dưới không thể sửa nữa.
-              </p>
+              <DesignStudio
+                sessionId={id}
+                hasLogo={answers.has_logo === 'yes'}
+                logoPosition={logoPosition}
+              />
             )}
 
-            {questions.sections.map((section) => (
-              <section key={section.title} className="mt-12">
-                <h2 className="overprint text-3xl font-extrabold">{section.title}</h2>
-                {section.questions
-                  .filter((question) => isVisible(question, answers))
-                  .map((question) => (
-                    <QuestionField
-                      key={question.id}
-                      question={question}
-                      value={answers[question.id]}
-                      error={errors.find((error) => error.questionId === question.id)?.code}
-                      disabled={answered}
-                      onChange={(value) => change(question.id, value)}
-                    />
-                  ))}
-              </section>
-            ))}
+            {answered ? (
+              <details className="mt-12 border-t border-mist pt-4">
+                <summary className="cursor-pointer font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+                  Xem câu trả lời của bạn
+                </summary>
+                {answerForm}
+              </details>
+            ) : (
+              answerForm
+            )}
 
             {!answered && (
               <div className="mt-12 flex flex-wrap items-center gap-4">
                 <Button size="lg" onClick={() => void submit()} disabled={submitting}>
-                  {submitting ? 'Đang gửi…' : 'Gửi câu trả lời'}
+                  {submitting ? 'Đang gửi…' : 'Gửi và tạo ảnh'}
                 </Button>
                 <p aria-live="polite" className="text-sm text-muted-foreground" data-testid="save-state">
                   {SAVE_LABELS[saveState]}

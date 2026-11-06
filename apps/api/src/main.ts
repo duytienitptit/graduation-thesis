@@ -8,6 +8,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
+  // Stops the bot and workers cleanly, so a restart does not fight the old process.
+  app.enableShutdownHooks();
+
   app.enableCors({ origin: config.getOrThrow<string>('WEB_ORIGIN') });
   app.useWebSocketAdapter(new RealtimeAdapter(app));
 

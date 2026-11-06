@@ -13,11 +13,20 @@ describe('seeded users', () => {
 
   afterAll(() => prisma.$disconnect());
 
-  it('has one customer, one designer and one manager', async () => {
+  it('has one customer, two designers with profiles and one manager', async () => {
     const users = await prisma.user.findMany({
       where: { email: { endsWith: '@example.test' } },
       orderBy: { role: 'asc' },
     });
-    expect(users.map((user) => user.role)).toEqual(['CUSTOMER', 'DESIGNER', 'MANAGER']);
+    expect(users.map((user) => user.role)).toEqual([
+      'CUSTOMER',
+      'DESIGNER',
+      'DESIGNER',
+      'MANAGER',
+    ]);
+    const profiles = await prisma.designerProfile.count({
+      where: { user: { email: { endsWith: '@example.test' } } },
+    });
+    expect(profiles).toBe(2);
   });
 });

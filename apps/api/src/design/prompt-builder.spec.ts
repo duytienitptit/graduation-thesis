@@ -2,7 +2,13 @@ import { describe, expect, it } from '@jest/globals';
 import { ShirtType } from '../integrations/catalog/catalog.port.js';
 import { Answers } from './answers.js';
 import { SpecSnapshot } from './design-session.service.js';
-import { buildFirstImagePrompt } from './prompt-builder.js';
+import {
+  buildBackPrompt,
+  buildCloseUpPrompt,
+  buildEditPrompt,
+  buildExtraViewPrompt,
+  buildFirstImagePrompt,
+} from './prompt-builder.js';
 
 function specs(shirtType: ShirtType, materialId = 'cool-knit'): SpecSnapshot {
   return {
@@ -81,10 +87,16 @@ describe('buildFirstImagePrompt', () => {
     expect(prompt).toContain('"FC Sài Gòn"');
     expect(prompt).toContain('vertical stripes');
     expect(prompt).toContain('polo collar');
-    expect(prompt).toContain('attached logo on the left chest');
+    expect(prompt).toContain("attached logo on the wearer's left chest");
     expect(prompt).toContain('"Công ty Ánh Dương"');
     expect(prompt).not.toContain('Tuấn');
     expect(referenceFileIds).toEqual(['logo-1']);
+  });
+
+  it('names the chest side from the wearer, with the matching side of the image', () => {
+    const answers = { ...FOOTBALL, logo_position: 'right-chest' };
+    const { prompt } = buildFirstImagePrompt(specs('FOOTBALL'), answers);
+    expect(prompt).toContain("wearer's right chest, which is the left side of the image");
   });
 
   it('builds a volleyball prompt, with the libero note left out of the image', () => {
@@ -109,7 +121,7 @@ describe('buildFirstImagePrompt', () => {
   it('describes a crest when the team has a logo but uploaded none', () => {
     const answers = { ...FOOTBALL, logo_upload: [] };
     const { prompt } = buildFirstImagePrompt(specs('FOOTBALL'), answers);
-    expect(prompt).toContain('A team crest is placed on the left chest.');
+    expect(prompt).toContain("A team crest is placed on the wearer's left chest");
     expect(prompt).not.toContain('attached logo');
   });
 
@@ -166,5 +178,75 @@ describe('buildFirstImagePrompt', () => {
     const { prompt } = buildFirstImagePrompt(specs('PRINTED'), COMMON);
     expect(prompt).not.toContain('accent mark');
     expect(prompt).not.toContain('square brackets');
+  });
+});
+
+describe('buildEditPrompt', () => {
+  it('asks for only the requested change and protects the rest', () => {
+    const prompt = buildEditPrompt('đổi logo sang ngực phải\nlàm to hơn');
+    expect(prompt).toContain('[đổi logo sang ngực phải làm to hơn]');
+    expect(prompt).toContain('Keep everything else exactly the same');
+    expect(prompt).toContain('Vietnamese accent marks');
+  });
+});
+
+describe('buildBackPrompt', () => {
+  it('prints the sample name and number on a football shirt, with spelling', () => {
+    const { prompt } = buildBackPrompt(FOOTBALL);
+    expect(prompt).toContain('Show the back of exactly this shirt');
+    expect(prompt).toContain('"Tuấn": the player name');
+    expect(prompt).toContain('T u ấ n');
+    expect(prompt).toContain('"10": the player number');
+  });
+
+  it('follows where the volleyball number is printed', () => {
+    expect(buildBackPrompt({ ...VOLLEYBALL, number_position: 'both' }).prompt).toContain('"7"');
+    expect(buildBackPrompt({ ...VOLLEYBALL, number_position: 'front' }).prompt).not.toContain('"7"');
+  });
+
+  it('uses the back description on a printed shirt, and may print its words', () => {
+    const { prompt } = buildBackPrompt(PRINTED);
+    expect(prompt).toContain('[Dòng chữ ở lưng]');
+    expect(prompt).toContain('print those words exactly');
+    expect(prompt).not.toContain('never print');
+  });
+
+  it('asks for a plain back when nothing is printed there', () => {
+    const answers = { ...COMMON, back_print: 'plain' };
+    expect(buildBackPrompt(answers).prompt).toContain('The back is plain');
+  });
+
+  it('never sends uploads, because the front already carries the design', () => {
+    expect(buildBackPrompt(FOOTBALL).referenceFileIds).toEqual([]);
+  });
+});
+
+describe('buildCloseUpPrompt', () => {
+  it('zooms in on the logo and sends the original logo', () => {
+    const { prompt, referenceFileIds } = buildCloseUpPrompt(FOOTBALL);
+    expect(prompt).toContain('tight close-up of the logo');
+    expect(prompt).toContain('original logo');
+    expect(referenceFileIds).toEqual(['logo-1']);
+  });
+
+  it('shows the main print on a shirt with no logo', () => {
+    const { prompt, referenceFileIds } = buildCloseUpPrompt(PRINTED);
+    expect(prompt).toContain('tight close-up of the main print');
+    expect(prompt).not.toContain('original logo');
+    expect(referenceFileIds).toEqual([]);
+  });
+
+  it('forbids adding or repeating anything', () => {
+    expect(buildCloseUpPrompt(PRINTED).prompt).toContain('Do not add, remove, repeat, move or redraw');
+    expect(buildCloseUpPrompt(PRINTED).prompt).toContain('Do not turn it into embroidery');
+  });
+});
+
+describe('buildExtraViewPrompt', () => {
+  it('shows the requested view and keeps the product', () => {
+    const { prompt } = buildExtraViewPrompt('cận tay áo');
+    expect(prompt).toContain('[cận tay áo]');
+    expect(prompt).toContain('Keep the product unchanged');
+    expect(prompt).toContain('never print those words');
   });
 });

@@ -67,7 +67,7 @@ Choose shirt and specs (Person 1)
 → Only with the 3 required views can the product be locked → Order (Person 1)
 ```
 
-Mandatory rule: **the customer must have at least one AI image** before choosing a designer. The first creation does not ask.
+Mandatory rule: **the customer must have at least one AI image** before choosing a designer. The first creation does not ask. The question is shown as two buttons beside the edit box, "Edit with AI" and "Need a designer", on every further edit (owner's choice, 2026-11-06).
 
 ## 4. Question set
 
