@@ -5,6 +5,7 @@ export const NOTICE_QUEUE = 'telegram-notices';
 export const NOTICE_JOB_ATTEMPTS = 5;
 export const SEND_JOB = 'send';
 export const MARK_TAKEN_JOB = 'mark-taken';
+export const CHAT_NOTICE_JOB = 'chat-notice';
 
 const JOB_OPTIONS = {
   attempts: NOTICE_JOB_ATTEMPTS,
@@ -36,5 +37,10 @@ export class QueuedTelegramSender extends TaskNoticeSender {
         opts: JOB_OPTIONS,
       })),
     );
+  }
+
+  async messageWaiting(designer: NoticeDesigner, task: { id: string }) {
+    if (!this.canReach(designer)) return;
+    await this.queue.add(CHAT_NOTICE_JOB, { taskId: task.id }, JOB_OPTIONS);
   }
 }

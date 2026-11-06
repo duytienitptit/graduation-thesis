@@ -1,9 +1,24 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
 import { IsIn, IsInt, Max, Min } from 'class-validator';
 import { FilePurpose } from '../../generated/prisma/enums.js';
 import { CurrentUser } from '../auth/auth.decorators.js';
 import { AuthUser } from '../auth/auth.port.js';
-import { ALLOWED_MIME_TYPES, AllowedMimeType, FilesPort, MAX_FILE_SIZE } from './files.port.js';
+import {
+  ALLOWED_MIME_TYPES,
+  AllowedMimeType,
+  FilesPort,
+  MAX_FILE_SIZE,
+  PDF_MIME_TYPE,
+} from './files.port.js';
 
 // AI images are stored by the backend, never uploaded by a client.
 const CLIENT_PURPOSES: FilePurpose[] = [
@@ -31,6 +46,10 @@ export class FilesController {
 
   @Post('upload-url')
   createUpload(@CurrentUser() user: AuthUser, @Body() body: CreateUploadDto) {
+    // Everywhere else a file may go to the image API, which takes only images.
+    if (body.mimeType === PDF_MIME_TYPE && body.purpose !== FilePurpose.CHAT) {
+      throw new BadRequestException('PDF files are only for chat');
+    }
     return this.files.createUpload(user, body);
   }
 

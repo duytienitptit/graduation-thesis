@@ -59,7 +59,7 @@ describe('Telegram handlers', () => {
   const offlineActions = (result: 'linked' | 'invalid-code' | 'chat-in-use') => {
     const link = jest.fn(async (_code: string, _chat: string, _name?: string) => result);
     const claim = jest.fn(async (_chat: string, _task: string) => 'claimed' as const);
-    return { link, claim };
+    return { link, claim, taskUrl: (taskId: string) => `http://web/${taskId}` };
   };
 
   it('greets on a plain /start, without linking', async () => {
@@ -104,7 +104,11 @@ describe('the Take task button', () => {
   async function pressWith(outcome: ClaimOutcome) {
     const { bot, calls } = offlineBot();
     const claim = jest.fn(async (_chat: string, _task: string) => outcome);
-    registerHandlers(bot, { link: async () => 'linked', claim });
+    registerHandlers(bot, {
+      link: async () => 'linked',
+      claim,
+      taskUrl: (taskId) => `http://web/designer/tasks/${taskId}`,
+    });
     await bot.handleUpdate(press(`${CLAIM_PREFIX}task-1`));
     return { calls, claim };
   }
@@ -118,6 +122,7 @@ describe('the Take task button', () => {
       'sendMessage',
     ]);
     expect(calls[0].payload).toMatchObject({ text: MESSAGES.claimed });
+    expect(calls[2].payload.text).toContain('http://web/designer/tasks/task-1');
   });
 
   it.each([

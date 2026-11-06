@@ -83,8 +83,14 @@ export interface PrintedText {
 
 export interface BuiltPrompt {
   prompt: string;
-  /** Customer uploads to send to the image API along with the prompt. */
+  /** Uploaded images to send to the image API along with the prompt. */
   referenceFileIds: string[];
+}
+
+/** What the designer sent about the back. At least one of the two is set. */
+export interface DesignerBack {
+  description: string | null;
+  fileId: string | null;
 }
 
 const text = (answers: Answers, id: string) => {
@@ -266,7 +272,9 @@ function backTexts(a: Answers): PrintedText[] {
 }
 
 /** The back view. The attached image is the approved front. */
-export function buildBackPrompt(answers: Answers): BuiltPrompt {
+export function buildBackPrompt(answers: Answers, designer?: DesignerBack): BuiltPrompt {
+  if (designer) return buildDesignerBackPrompt(designer);
+
   const description = text(answers, 'back_description');
   const texts = backTexts(answers);
 
@@ -285,6 +293,26 @@ export function buildBackPrompt(answers: Answers): BuiltPrompt {
     lines.push('The back is plain, with no print, no text and no logo.');
   }
   return { prompt: lines.join('\n'), referenceFileIds: [] };
+}
+
+/** On the designer branch the designer's content replaces the customer's answers. */
+function buildDesignerBackPrompt({ description, fileId }: DesignerBack): BuiltPrompt {
+  const lines = [
+    'The first attached image is the front of a shirt. Show the back of exactly this shirt, flat and centred.',
+    KEEP_PRODUCT,
+  ];
+  if (fileId) {
+    lines.push(
+      'The second attached image is the back design from the designer: put exactly this design on the back of the shirt, with its shape, colours and every Vietnamese accent mark.',
+    );
+  }
+  if (description) {
+    lines.push(
+      `The designer describes the back as: ${described(description)}.`,
+      'If that description names words to print, print those words exactly, with every Vietnamese accent mark.',
+    );
+  }
+  return { prompt: lines.join('\n'), referenceFileIds: fileId ? [fileId] : [] };
 }
 
 /** The close-up view: the logo, or the main print on a shirt with no logo. */

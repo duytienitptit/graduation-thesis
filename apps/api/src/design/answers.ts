@@ -34,6 +34,25 @@ function checkValue(question: Question, value: unknown): AnswerError['code'] | n
   }
 }
 
+function answerText(question: Question, value: AnswerValue) {
+  if (question.type === 'upload') return `${(value as string[]).length} ảnh tải lên`;
+  if (question.type === 'choice') {
+    return question.options.find((option) => option.value === value)?.label ?? String(value);
+  }
+  return String(value);
+}
+
+/** The answers in the words the customer saw. */
+export function answerList(set: QuestionSet, answers: Answers) {
+  return questionsOf(set)
+    .filter((question) => answers[question.id] !== undefined)
+    .map((question) => ({
+      id: question.id,
+      label: question.label,
+      text: answerText(question, answers[question.id]),
+    }));
+}
+
 const isEmpty = (value: unknown) =>
   value === null ||
   value === undefined ||

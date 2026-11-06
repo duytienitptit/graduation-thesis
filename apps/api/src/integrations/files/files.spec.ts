@@ -84,6 +84,39 @@ describe('files', () => {
     await send({ ...valid, purpose: 'AI_IMAGE' }).expect(400);
   });
 
+  it('takes a real PDF in chat, and nowhere else', async () => {
+    const pdf = Buffer.from('%PDF-1.7 rest of a test document');
+    const send = (purpose: string) =>
+      request(server())
+        .post('/files/upload-url')
+        .set(...bearer(customer))
+        .send({ mimeType: 'application/pdf', size: pdf.length, purpose });
+    await send('FINAL_DESIGN').expect(400);
+
+    const res = await send('CHAT').expect(201);
+    created.push(res.body.fileId);
+    expect((await put(res.body, pdf)).status).toBe(200);
+    await request(server())
+      .post(`/files/${res.body.fileId}/complete`)
+      .set(...bearer(customer))
+      .expect(204);
+  });
+
+  it('rejects a file that claims to be a PDF but is not', async () => {
+    const fake = Buffer.from('this is plain text, not a PDF');
+    const res = await request(server())
+      .post('/files/upload-url')
+      .set(...bearer(customer))
+      .send({ mimeType: 'application/pdf', size: fake.length, purpose: 'CHAT' })
+      .expect(201);
+    created.push(res.body.fileId);
+    await put(res.body, fake);
+    await request(server())
+      .post(`/files/${res.body.fileId}/complete`)
+      .set(...bearer(customer))
+      .expect(400);
+  });
+
   it('accepts exactly 10 MB', async () => {
     const body = Buffer.concat([PNG, Buffer.alloc(MAX_FILE_SIZE - PNG.length)]);
     await uploaded(body);

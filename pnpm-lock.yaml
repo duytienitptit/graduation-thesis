@@ -166,9 +166,18 @@ importers:
 
   .:
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.64.1
+        version: 1.64.1
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
       concurrently:
         specifier: ^9.2.1
         version: 9.2.5
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
 
   apps/api:
     dependencies:
@@ -304,7 +313,7 @@ importers:
         version: 1.69.0(@types/react@19.3.0)(react@19.3.1)
       next:
         specifier: ^16.4.5
-        version: 16.4.5(@babel/core@7.29.13(supports-color@8.1.1))(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 16.4.5(@babel/core@7.29.13(supports-color@8.1.1))(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -1663,6 +1672,11 @@ packages:
   '@pkgr/core@0.3.6':
     resolution: {integrity: sha512-SEeaJLb3qBNF/OaXnaR1NmmBbFYk1zC0ZH/52fATcRPLFg/p791YrcyFFy44Bo9sLaGuSuLp5Q6axbb/O+v/RA==}
     engines: {node: ^14.18.0 || >=16.0.0}
+
+  '@playwright/test@1.64.1':
+    resolution: {integrity: sha512-IaYGml/nSOiZWROfPtuIL7neuu9qDOZ3TNvNljUIrhDMxiGTgPjzj/g9p9RxpS2tSepPDRY+UwAaEeiKtUvIAg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@prisma/adapter-pg@7.10.1':
     resolution: {integrity: sha512-EP9ruPYHjKP80WZlb5qVaEXKgZjJieBFjAxcBtQnDAHD6+16UN4keVmBh6L/RUpuDQT2FQRbvKNgq5d4Ix+IkQ==}
@@ -4101,6 +4115,16 @@ packages:
     resolution: {integrity: sha512-nDywThFk1i4BQK4twPQ6TA4RT8bDY96yeuCVBWL3ePARCiEKDRSrNGbFIgUJpLp+XeIR65v8ra7WuJOFUBtkMA==}
     engines: {node: '>=8'}
 
+  playwright-core@1.64.1:
+    resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.64.1:
+    resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   pluralize@8.0.0:
     resolution: {integrity: sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA==}
     engines: {node: '>=4'}
@@ -6258,6 +6282,10 @@ snapshots:
 
   '@pkgr/core@0.3.6': {}
 
+  '@playwright/test@1.64.1':
+    dependencies:
+      playwright: 1.64.1
+
   '@prisma/adapter-pg@7.10.1':
     dependencies:
       '@prisma/driver-adapter-utils': 7.10.1
@@ -6717,7 +6745,7 @@ snapshots:
 
   '@types/pg@8.23.1':
     dependencies:
-      '@types/node': 26.6.6
+      '@types/node': 24.19.2
       pg-protocol: 1.16.1
       pg-types: 2.2.0
 
@@ -8640,7 +8668,7 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  next@16.4.5(@babel/core@7.29.13(supports-color@8.1.1))(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
+  next@16.4.5(@babel/core@7.29.13(supports-color@8.1.1))(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
     dependencies:
       '@next/env': 16.4.5
       '@swc/helpers': 0.5.23
@@ -8659,6 +8687,7 @@ snapshots:
       '@next/swc-linux-x64-musl': 16.4.5
       '@next/swc-win32-arm64-msvc': 16.4.5
       '@next/swc-win32-x64-msvc': 16.4.5
+      '@playwright/test': 1.64.1
       sharp: 0.35.5(@types/node@24.19.2)
     transitivePeerDependencies:
       - '@babel/core'
@@ -8877,6 +8906,12 @@ snapshots:
   pkg-up@3.1.0:
     dependencies:
       find-up: 3.0.0
+
+  playwright-core@1.64.1: {}
+
+  playwright@1.64.1:
+    dependencies:
+      playwright-core: 1.64.1
 
   pluralize@8.0.0: {}
 

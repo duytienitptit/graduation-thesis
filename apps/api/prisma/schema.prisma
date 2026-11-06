@@ -27,6 +27,7 @@ model User {
   aiJobs         AiJob[]
   designer       DesignerProfile?
   tasks          Task[]
+  taskMessages   TaskMessage[]
 }
 
 enum FilePurpose {
@@ -53,7 +54,9 @@ model FileObject {
   status     FileStatus  @default(PENDING)
   createdAt  DateTime    @default(now())
 
-  versions DesignVersion[]
+  versions     DesignVersion[]
+  messages     TaskMessage[]
+  backForTasks Task[]
 
   @@index([ownerId])
 }
@@ -105,9 +108,12 @@ model DesignVersion {
   prompt          String?
   createdAt       DateTime            @default(now())
 
-  aiJob AiJob?
-  views ProductView[]
-  tasks Task[]
+  aiJob         AiJob?
+  views         ProductView[]
+  tasks         Task[]        @relation("TaskReference")
+  agreedInTasks Task[]        @relation("TaskAgreed")
+  finalInTasks  Task[]        @relation("TaskFinal")
+  messages      TaskMessage[]
 
   @@index([sessionId])
 }
@@ -224,6 +230,7 @@ model DesignerProfile {
 enum TaskStatus {
   WAITING
   ASSIGNED
+  DONE
 }
 
 model Task {
@@ -235,17 +242,57 @@ model Task {
   requirement        String
   /// The AI image the customer was looking at. Answers come from the session.
   referenceVersionId String
-  referenceVersion   DesignVersion    @relation(fields: [referenceVersionId], references: [id])
+  referenceVersion   DesignVersion    @relation("TaskReference", fields: [referenceVersionId], references: [id])
   status             TaskStatus       @default(WAITING)
   designerId         String?
   designer           DesignerProfile? @relation(fields: [designerId], references: [id])
   createdAt          DateTime         @default(now())
   assignedAt         DateTime?
+  /// The sample the customer agreed to. A newer sample clears it.
+  agreedVersionId    String?
+  agreedVersion      DesignVersion?   @relation("TaskAgreed", fields: [agreedVersionId], references: [id])
+  agreedAt           DateTime?
+  /// The designer's main image. Sending a new final replaces it until the task is done.
+  finalVersionId     String?
+  finalVersion       DesignVersion?   @relation("TaskFinal", fields: [finalVersionId], references: [id])
+  /// What the back shows. A final needs at least one of these two.
+  backDescription    String?
+  backFileId         String?
+  backFile           FileObject?      @relation(fields: [backFileId], references: [id])
+  doneAt             DateTime?
+  /// Limits Telegram notices about customer messages.
+  lastChatNoticeAt   DateTime?
 
-  notices TaskNotice[]
+  notices  TaskNotice[]
+  messages TaskMessage[]
 
   @@index([status, createdAt])
   @@index([sessionId])
+}
+
+enum TaskMessageKind {
+  TEXT
+  FILE
+  SAMPLE
+  FINAL
+}
+
+// One chat entry. Samples and finals show a version; on a final the file is the back image.
+model TaskMessage {
+  id        String          @id @default(uuid())
+  taskId    String
+  task      Task            @relation(fields: [taskId], references: [id])
+  senderId  String
+  sender    User            @relation(fields: [senderId], references: [id])
+  kind      TaskMessageKind
+  text      String?
+  fileId    String?
+  file      FileObject?     @relation(fields: [fileId], references: [id])
+  versionId String?
+  version   DesignVersion?  @relation(fields: [versionId], references: [id])
+  createdAt DateTime        @default(now())
+
+  @@index([taskId, createdAt])
 }
 
 // One message to one designer about one task, at most once per Vietnam day.

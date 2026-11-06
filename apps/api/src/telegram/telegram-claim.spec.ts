@@ -26,6 +26,8 @@ class RecordingSender extends TaskNoticeSender {
   async markTaken(task: NoticeTask, notices: { id: string }[]) {
     this.taken.push({ taskId: task.id, ids: notices.map((notice) => notice.id) });
   }
+
+  async messageWaiting() {}
 }
 
 describe('two linked designers press Take task', () => {
@@ -47,6 +49,7 @@ describe('two linked designers press Take task', () => {
     registerHandlers(bot, {
       link: async () => 'linked',
       claim: (chatId, taskId) => service.claim(chatId, taskId),
+      taskUrl: (taskId) => `http://web/${taskId}`,
     });
     return { bot, calls };
   }

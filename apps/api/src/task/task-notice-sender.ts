@@ -22,6 +22,8 @@ export abstract class TaskNoticeSender {
   ): Promise<string | null>;
   /** Tells the designers who did not get the task. */
   abstract markTaken(task: NoticeTask, notices: { id: string }[]): Promise<void>;
+  /** Tells the task's designer that the customer did something in the chat. */
+  abstract messageWaiting(designer: NoticeDesigner, task: { id: string }): Promise<void>;
 }
 
 export class FakeTaskNoticeSender extends TaskNoticeSender {
@@ -38,5 +40,9 @@ export class FakeTaskNoticeSender extends TaskNoticeSender {
 
   async markTaken(task: NoticeTask, notices: unknown[]) {
     this.logger.log(`Task ${task.id} taken; ${notices.length} other notices to update`);
+  }
+
+  async messageWaiting(designer: NoticeDesigner, task: { id: string }) {
+    this.logger.log(`Task ${task.id} has a new message for designer ${designer.id}`);
   }
 }

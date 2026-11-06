@@ -35,6 +35,8 @@ class RecordingSender extends TaskNoticeSender {
   async markTaken(task: NoticeTask, notices: { id: string }[]) {
     this.taken.push({ taskId: task.id, count: notices.length });
   }
+
+  async messageWaiting() {}
 }
 
 // 10:00, 18:00 and 08:00 in Vietnam.
@@ -321,6 +323,8 @@ describe('tasks and dispatch', () => {
     it('gives all waiting tasks to a designer who becomes free', async () => {
       const designer = await newDesigner('BUSY');
       const first = await newTask();
+      // The clock is fixed, so without this the two tasks tie and their order is random.
+      now = new Date(IN_HOURS.getTime() + 60_000);
       const second = await newTask();
       expect(sentTo(designer.id)).toEqual([]);
       await tasks.setFree(designer.id);
@@ -418,7 +422,7 @@ describe('tasks and dispatch', () => {
         await new Promise<void>((resolve) => socket.once('connect', () => resolve()));
         const event = new Promise((resolve) => socket.once(TASK_EVENT, resolve));
         await tasks.claim(designer.id, task.id);
-        await expect(event).resolves.toEqual({ sessionId: session.id, status: 'ASSIGNED' });
+        await expect(event).resolves.toEqual({ sessionId: session.id, taskId: task.id });
       } finally {
         socket.disconnect();
       }

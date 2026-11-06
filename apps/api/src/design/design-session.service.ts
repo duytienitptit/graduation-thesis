@@ -58,7 +58,6 @@ export class DesignSessionService {
   async get(user: AuthUser, id: string) {
     const session = await this.prisma.designSession.findUnique({ where: { id } });
     if (!session) throw new NotFoundException();
-    // Designers working on a task gain access in phase 7.
     if (session.customerId !== user.id && user.role !== Role.MANAGER) {
       throw new ForbiddenException();
     }

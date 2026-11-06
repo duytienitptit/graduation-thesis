@@ -3,6 +3,7 @@ import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
 import { AiModule } from './ai/ai.module.js';
+import { ChatModule } from './chat/chat.module.js';
 import { ClockModule } from './common/clock.js';
 import { DesignModule } from './design/design.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -27,6 +28,7 @@ import { TelegramModule } from './telegram/telegram.module.js';
     RealtimeModule,
     TaskModule,
     TelegramModule,
+    ChatModule,
     DesignModule,
     HealthModule,
   ],

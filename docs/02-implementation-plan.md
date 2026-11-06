@@ -150,12 +150,39 @@ Steps (the owner reviews each one before the next):
 
 **Done when:** with 2 real linked Telegram accounts, the first press wins, the second is rejected, and messages update.
 
-### ⬜ Phase 7 — Chat and completion
+### ✅ Phase 7 — Chat and completion
 - Designer area on the web, chat with stored messages and files, sample images in chat.
 - "Agree" button, final with required back content, "Done" button with its conditions.
 - Hand the main image to the views step, with the designer's back content.
 
+Owner's choices (2026-11-06):
+- Chat files are PNG, JPG and PDF, at most 10 MB.
+- "Done" moves the session to the views step at once and starts the back and close-up, counted against the customer's daily limit.
+- The final becomes an approved front view, with no second approval by the customer.
+- A designer's back image goes to AI as a reference, and AI draws the back.
+- "Agree" works on any sample and belongs to that sample. A new sample cancels it. The final needs a standing "Agree" and can be re-sent until "Done"; the newest counts.
+- Messages are sent by REST and received live over Socket.IO.
+- The task module checks file permission, then asks `FilesPort` for the link through a new method. This needs Person 2's agreement in phase 10.
+- `/designer` holds state, Telegram, the current task and past tasks. `/designer/tasks/[id]` holds the customer's information and the chat.
+- After a claim the bot sends a link to the task page. A customer's message sends a Telegram notice, at most once per 10 minutes per task.
+
+Steps (the owner reviews each one before the next):
+- ✅ 7.1 Task message table, task fields for the agreed sample, final and back content, and a finished task status
+- ✅ 7.2 File and session access: a designer reads the files of their task, and both sides read chat files
+- ✅ 7.3 Designer task API: current task, past tasks, and one task with its requirement, AI image, answers and uploads
+- ✅ 7.4 Chat API: stored messages and files, only for the task's two people, pushed live over Socket.IO, with the Telegram notice for customer messages
+- ✅ 7.5 Sample images in chat and the customer's "Agree" button
+- ✅ 7.6 The final: one main image, with a required back description or back image
+- ✅ 7.7 "Done" with its conditions: the task ends, the designer returns to Free, and the queue is checked
+- ✅ 7.8 Hand over to the views step: the final becomes the front view, and the back uses the designer's content
+- ✅ 7.9 Web: designer area, with the task list and the task page, and the bot's link to it after a claim
+- ✅ 7.10 Web: one chat component for both sides, replacing the customer's "designer took it" panel
+- ✅ 7.11 Web: "Agree", the final form and "Done", then on to the views screen
+- ✅ 7.12 Playwright happy path, then the "Done when" check in a real browser
+
 **Done when:** the full designer branch runs from task to a locked product, and a Playwright test covers the happy path.
+
+Done 2026-11-06. `pnpm test:e2e` runs the path in Chromium on its own API and web, with the bot off and fake images. The task is claimed through the `dev-claim` route, because a browser cannot press the Telegram button. Not verified: the bot's link after a real claim, a real Telegram notice for a customer message, and a real image of a back made from designer content.
 
 ### ⬜ Phase 8 — Exceptions
 - Customer notices when nobody takes a task, daily re-send, cancel after 48 hours.

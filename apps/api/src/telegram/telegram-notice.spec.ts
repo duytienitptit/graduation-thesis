@@ -17,6 +17,7 @@ describe('Telegram notices', () => {
   let processor: TelegramNoticeProcessor;
   const sent: { chatId: string; photo: Buffer; options: { caption: string } }[] = [];
   const replaced: { chatId: string; messageId: number; text: string }[] = [];
+  const texts: { chatId: string; text: string }[] = [];
   let failure: Error | null = null;
   const userIds: string[] = [];
 
@@ -96,6 +97,10 @@ describe('Telegram notices', () => {
           if (failure) throw failure;
           replaced.push({ chatId, messageId, text });
         },
+        sendText: async (chatId: string, text: string) => {
+          texts.push({ chatId, text });
+        },
+        taskUrl: (taskId: string) => `http://web/designer/tasks/${taskId}`,
         sendPhoto: async (chatId: string, photo: Buffer, options: { caption: string }) => {
           if (failure) throw failure;
           sent.push({ chatId, photo, options });
@@ -116,6 +121,7 @@ describe('Telegram notices', () => {
   afterEach(() => {
     sent.length = 0;
     replaced.length = 0;
+    texts.length = 0;
     failure = null;
   });
 
@@ -184,6 +190,27 @@ describe('Telegram notices', () => {
     await run(row.id);
     failure = new Error('Telegram down');
     await expect(markTaken(row.id)).rejects.toThrow('Telegram down');
+  });
+
+  it('tells the task\'s designer about a customer message, with a link to the task', async () => {
+    const { taskId, designerId } = await notice('ASSIGNED');
+    const designer = await prisma.designerProfile.findUniqueOrThrow({ where: { id: designerId } });
+    await prisma.task.update({ where: { id: taskId }, data: { designerId } });
+
+    await processor.process({ name: 'chat-notice', data: { taskId } } as Job);
+
+    expect(texts).toEqual([
+      {
+        chatId: designer.telegramChatId,
+        text: `${MESSAGES.chatNotice}\nhttp://web/designer/tasks/${taskId}`,
+      },
+    ]);
+  });
+
+  it('skips the notice once the task is no longer open', async () => {
+    const { taskId } = await notice('WAITING');
+    await processor.process({ name: 'chat-notice', data: { taskId } } as Job);
+    expect(texts).toEqual([]);
   });
 
   it('keeps the notice for a retry, and removes it after the last attempt', async () => {

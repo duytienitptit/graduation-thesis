@@ -180,6 +180,8 @@ The wording is a draft that the project owner reviewed, removing the "other spor
 - The designer consults and works their own way. **The system does not script the steps.**
 - The system provides: chat, sample image sending, an **"Agree"** button for the customer, a **"Done"** button for the designer.
 - Samples appear in chat, with no separate approval screen. The customer requests edits by message.
+- Chat files are PNG, JPG and PDF, at most 10 MB (owner's choice, 2026-11-06).
+- A customer's message sends the designer a Telegram notice, at most once per 10 minutes per task (owner's choice, 2026-11-06).
 
 ### 7.4 Completion
 1. The customer presses "Agree" on a sample.
@@ -188,6 +190,12 @@ The wording is a draft that the project owner reviewed, removing the "other spor
 4. The main image moves to the angle step in section 6.
 
 **[Claude's proposal]** "Done" can only be pressed after the customer pressed "Agree" and the final and back content were sent.
+
+Owner's choices (2026-11-06):
+- "Agree" works on any sample and belongs to that sample. A new sample cancels it. The final needs a standing "Agree", and it can be re-sent until "Done"; the newest counts.
+- "Done" starts the angle step at once. The back and close-up count against the customer's daily limit; out of credits, they wait as on the AI branch.
+- The final becomes an approved front view, because the customer already agreed. There is no second approval.
+- A designer's back image goes to AI as a reference, and AI draws the back.
 
 ### 7.5 Stuck tasks
 - **Designer silent:** after 24 hours without activity the system alerts the manager, who returns the task to the queue.

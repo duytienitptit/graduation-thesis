@@ -93,7 +93,10 @@ export class TasksService {
         // Throwing rolls back the designer, who stays Free.
         if (!assigned.count) throw new ClaimRefused('already-taken');
 
-        return tx.task.findUniqueOrThrow({ where: { id: taskId } });
+        return tx.task.findUniqueOrThrow({
+          where: { id: taskId },
+          include: { designer: true },
+        });
       });
     } catch (error) {
       if (error instanceof ClaimRefused) return { ok: false, reason: error.reason };
@@ -105,11 +108,20 @@ export class TasksService {
       select: { id: true },
     });
     await this.sender.markTaken(task, others);
-    this.realtime.emitToUser(task.customerId, TASK_EVENT, {
-      sessionId: task.sessionId,
-      status: task.status,
-    });
+    this.announce(task);
     return { ok: true, taskId };
+  }
+
+  /** Only a nudge: both pages reload the task, so a missed event loses nothing. */
+  announce(task: {
+    id: string;
+    sessionId: string;
+    customerId: string;
+    designer?: { userId: string } | null;
+  }) {
+    const event = { sessionId: task.sessionId, taskId: task.id };
+    this.realtime.emitToUser(task.customerId, TASK_EVENT, event);
+    if (task.designer) this.realtime.emitToUser(task.designer.userId, TASK_EVENT, event);
   }
 
   /** A designer who becomes free receives every waiting task. */

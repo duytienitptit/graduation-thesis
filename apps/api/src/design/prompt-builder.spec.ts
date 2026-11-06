@@ -191,6 +191,26 @@ describe('buildEditPrompt', () => {
 });
 
 describe('buildBackPrompt', () => {
+  it('follows the designer instead of the answers', () => {
+    const { prompt, referenceFileIds } = buildBackPrompt(FOOTBALL, {
+      description: 'In chữ "ĐỘI A" giữa lưng',
+      fileId: null,
+    });
+    expect(prompt).toContain('The designer describes the back as: [In chữ "ĐỘI A" giữa lưng]');
+    expect(prompt).not.toContain('Tuấn');
+    expect(referenceFileIds).toEqual([]);
+  });
+
+  it('sends the designer\'s back image as the second image', () => {
+    const { prompt, referenceFileIds } = buildBackPrompt(FOOTBALL, {
+      description: null,
+      fileId: 'back-file',
+    });
+    expect(prompt).toContain('The second attached image is the back design');
+    expect(prompt).not.toContain('The designer describes');
+    expect(referenceFileIds).toEqual(['back-file']);
+  });
+
   it('prints the sample name and number on a football shirt, with spelling', () => {
     const { prompt } = buildBackPrompt(FOOTBALL);
     expect(prompt).toContain('Show the back of exactly this shirt');

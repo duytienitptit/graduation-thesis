@@ -25,6 +25,7 @@ import {
   CreateUploadInput,
   DownloadLink,
   FilesPort,
+  IMAGE_MIME_TYPES,
   MAX_FILE_SIZE,
   StoredImage,
   UploadTicket,
@@ -34,10 +35,15 @@ import { createS3Client } from './s3.client.js';
 const UPLOAD_URL_SECONDS = 5 * 60;
 const DOWNLOAD_URL_SECONDS = 10 * 60;
 
-const EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg' };
+const EXTENSIONS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'application/pdf': 'pdf',
+};
 const SIGNATURES: Record<string, number[]> = {
   'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
   'image/jpeg': [0xff, 0xd8, 0xff],
+  'application/pdf': [0x25, 0x50, 0x44, 0x46, 0x2d],
 };
 
 /** Stand-in file service on MinIO. Files go straight from the browser to storage. */
@@ -112,7 +118,7 @@ export class MinioFilesService extends FilesPort implements OnModuleInit, OnModu
     if (!validType || (head.ContentLength ?? 0) > MAX_FILE_SIZE) {
       await this.s3.send(new DeleteObjectCommand(target));
       await this.prisma.fileObject.delete({ where: { id: file.id } });
-      throw new BadRequestException('File must be a PNG or JPG of at most 10 MB');
+      throw new BadRequestException('File must be a PNG, JPG or PDF of at most 10 MB');
     }
 
     await this.prisma.fileObject.update({ where: { id: file.id }, data: { status: 'READY' } });
@@ -120,8 +126,15 @@ export class MinioFilesService extends FilesPort implements OnModuleInit, OnModu
 
   async getDownloadLink(user: AuthUser, fileId: string): Promise<DownloadLink> {
     const file = await this.findFile(fileId);
-    // Designers working on a task gain access to its files in phase 7.
     if (file.ownerId !== user.id && user.role !== Role.MANAGER) throw new ForbiddenException();
+    return this.linkTo(file);
+  }
+
+  async getLink(fileId: string) {
+    return this.linkTo(await this.findFile(fileId));
+  }
+
+  private async linkTo(file: { status: string; storageKey: string }): Promise<DownloadLink> {
     if (file.status !== 'READY') throw new ConflictException('File has not been uploaded');
 
     const url = await getSignedUrl(
@@ -170,9 +183,18 @@ export class MinioFilesService extends FilesPort implements OnModuleInit, OnModu
     };
   }
 
-  async ownsReadyFiles(user: AuthUser, fileIds: string[]) {
+  async ownsReadyFiles(
+    user: AuthUser,
+    fileIds: string[],
+    mimeTypes: readonly string[] = IMAGE_MIME_TYPES,
+  ) {
     const count = await this.prisma.fileObject.count({
-      where: { id: { in: fileIds }, ownerId: user.id, status: 'READY' },
+      where: {
+        id: { in: fileIds },
+        ownerId: user.id,
+        status: 'READY',
+        mimeType: { in: [...mimeTypes] },
+      },
     });
     return count === new Set(fileIds).size;
   }

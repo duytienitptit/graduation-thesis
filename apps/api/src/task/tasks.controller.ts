@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   ConflictException,
+  Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -14,6 +15,7 @@ import { CurrentUser, Roles } from '../integrations/auth/auth.decorators.js';
 import { AuthUser } from '../integrations/auth/auth.port.js';
 import { DevOnlyGuard } from '../integrations/auth/dev-auth.controller.js';
 import { DesignersService } from './designers.service.js';
+import { TaskDetailsService } from './task-details.service.js';
 import { TasksService } from './tasks.service.js';
 
 class CreateTaskDto {
@@ -31,7 +33,13 @@ export class TasksController {
   constructor(
     private readonly tasks: TasksService,
     private readonly designers: DesignersService,
+    private readonly details: TaskDetailsService,
   ) {}
+
+  @Get('tasks/:id')
+  detail(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.details.detail(user, id);
+  }
 
   @Roles(Role.CUSTOMER)
   @Post('design/sessions/:id/tasks')
@@ -43,7 +51,7 @@ export class TasksController {
     return this.tasks.create(user, id, body.versionId, body.requirement);
   }
 
-  /** Stands in for the Telegram button until phase 6, so it never runs in production. */
+  /** Stands in for the Telegram button in browser tests, so it never runs in production. */
   @Roles(Role.DESIGNER)
   @UseGuards(DevOnlyGuard)
   @Post('tasks/:id/dev-claim')

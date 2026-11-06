@@ -77,7 +77,7 @@ export class DesignImagesService {
     const [versions, latestJob, usage, views, locked, task] = await Promise.all([
       this.prisma.designVersion.findMany({
         // View images belong to their view, not to the editing history.
-        where: { sessionId, NOT: { aiJob: { kind: 'VIEW' } } },
+        where: { sessionId, source: 'AI', NOT: { aiJob: { kind: 'VIEW' } } },
         orderBy: { createdAt: 'asc' },
         include: { aiJob: { select: { editRequest: true } } },
       }),
@@ -110,7 +110,7 @@ export class DesignImagesService {
           source: version.source,
           editRequest: version.aiJob?.editRequest ?? null,
           createdAt: version.createdAt,
-          imageUrl: (await this.files.getDownloadLink(user, version.fileId)).url,
+          imageUrl: (await this.files.getLink(version.fileId)).url,
         })),
       ),
       latestJob,
@@ -125,7 +125,7 @@ export class DesignImagesService {
           versionId: view.versionId,
           jobStatus: view.aiJobs[0]?.status ?? null,
           imageUrl: view.version
-            ? (await this.files.getDownloadLink(user, view.version.fileId)).url
+            ? (await this.files.getLink(view.version.fileId)).url
             : null,
         })),
       ),

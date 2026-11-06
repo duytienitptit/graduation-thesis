@@ -7,6 +7,7 @@ import { SpecSnapshot } from '../design/design-session.service.js';
 import { FilesPort } from '../integrations/files/files.port.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
+  CHAT_NOTICE_JOB,
   MARK_TAKEN_JOB,
   NOTICE_JOB_ATTEMPTS,
   NOTICE_QUEUE,
@@ -27,8 +28,22 @@ export class TelegramNoticeProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ noticeId: string }>) {
+  async process(job: Job) {
+    if (job.name === CHAT_NOTICE_JOB) return this.chatNotice(job);
     return job.name === MARK_TAKEN_JOB ? this.markTaken(job) : this.send(job);
+  }
+
+  private async chatNotice(job: Job<{ taskId: string }>) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: job.data.taskId },
+      include: { designer: true },
+    });
+    if (task?.status !== 'ASSIGNED' || !task.designer?.telegramChatId) return;
+
+    await this.bot.sendText(
+      task.designer.telegramChatId,
+      `${MESSAGES.chatNotice}\n${this.bot.taskUrl(task.id)}`,
+    );
   }
 
   private async markTaken(job: Job<{ noticeId: string }>) {

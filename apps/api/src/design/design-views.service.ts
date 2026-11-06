@@ -5,13 +5,19 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ImageJobsService } from '../ai/image-jobs.service.js';
+import { Clock } from '../common/clock.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { Role } from '../generated/prisma/enums.js';
 import { AuthUser } from '../integrations/auth/auth.port.js';
 import { FilesPort } from '../integrations/files/files.port.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TaskAccessService } from '../task/task-access.service.js';
+import { TaskDispatchService } from '../task/task-dispatch.service.js';
+import { TasksService } from '../task/tasks.service.js';
 import { Answers, uploadedFileIds } from './answers.js';
 import { DesignSessionService, SpecSnapshot } from './design-session.service.js';
 import { buildBackPrompt, buildCloseUpPrompt, buildExtraViewPrompt } from './prompt-builder.js';
@@ -23,11 +29,17 @@ export const MAX_EXTRA_VIEWS = 2;
 
 @Injectable()
 export class DesignViewsService {
+  private readonly logger = new Logger(DesignViewsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessions: DesignSessionService,
     private readonly jobs: ImageJobsService,
     private readonly files: FilesPort,
+    private readonly access: TaskAccessService,
+    private readonly tasks: TasksService,
+    private readonly dispatcher: TaskDispatchService,
+    private readonly clock: Clock,
   ) {}
 
   /**
@@ -54,12 +66,7 @@ export class DesignViewsService {
       });
       if (!count) throw new ConflictException('A main image cannot be chosen now');
 
-      await tx.productView.create({
-        data: { sessionId, type: 'FRONT', versionId, status: 'APPROVED' },
-      });
-      return Promise.all(
-        GENERATED_VIEWS.map((type) => tx.productView.create({ data: { sessionId, type } })),
-      );
+      return this.createViews(tx, sessionId, versionId);
     });
 
     for (const type of GENERATED_VIEWS) {
@@ -70,6 +77,56 @@ export class DesignViewsService {
       });
     }
     return this.prisma.productView.findMany({ where: { sessionId } });
+  }
+
+  /**
+   * The designer's "Done". Ending the task, freeing the designer and starting the views
+   * are one transaction, so a designer can never stay Busy on a finished task.
+   */
+  async finishTask(designer: AuthUser, taskId: string) {
+    const task = await this.access.openAs(designer, taskId, 'DESIGNER');
+
+    const { views, finished } = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.task.updateMany({
+        where: {
+          id: taskId,
+          status: 'ASSIGNED',
+          agreedVersionId: { not: null },
+          finalVersionId: { not: null },
+        },
+        data: { status: 'DONE', doneAt: this.clock.now() },
+      });
+      if (!count) throw new ConflictException({ code: 'not-ready' });
+
+      // A manager may have paused this designer meanwhile, which stays as it is.
+      await tx.designerProfile.updateMany({
+        where: { id: task.designerId!, state: 'BUSY' },
+        data: { state: 'FREE' },
+      });
+
+      const moved = await tx.designSession.updateMany({
+        where: { id: task.sessionId, status: 'DESIGNER' },
+        data: { status: 'VIEWS' },
+      });
+      if (!moved.count) throw new ConflictException('This session is not with a designer');
+
+      const finished = await tx.task.findUniqueOrThrow({ where: { id: taskId } });
+      const views = await this.createViews(tx, task.sessionId, finished.finalVersionId!);
+      return { views, finished };
+    });
+
+    const session = await this.prisma.designSession.findUniqueOrThrow({
+      where: { id: finished.sessionId },
+    });
+    for (const view of views) {
+      // The task is finished whatever happens here: a view left waiting has its own button.
+      await this.startJob({ id: session.customerId }, session, view).catch((error: unknown) => {
+        if (!isDailyLimit(error)) this.logger.warn(`View not started: ${String(error)}`);
+      });
+    }
+
+    this.tasks.announce(task);
+    await this.dispatcher.dispatch();
   }
 
   /** Starts a view that has no image yet, including after a failure or the daily limit. */
@@ -200,16 +257,26 @@ export class DesignViewsService {
           description: view.description,
           source: view.version!.source,
           fileId: view.version!.fileId,
-          imageUrl: (await this.files.getDownloadLink(user, view.version!.fileId)).url,
+          imageUrl: (await this.files.getLink(view.version!.fileId)).url,
         })),
       ),
       uploads: await Promise.all(
         uploads.map(async (fileId) => ({
           fileId,
-          url: (await this.files.getDownloadLink(user, fileId)).url,
+          url: (await this.files.getLink(fileId)).url,
         })),
       ),
     };
+  }
+
+  /** The main image is approved already, because the customer chose or agreed to it. */
+  private async createViews(tx: Prisma.TransactionClient, sessionId: string, versionId: string) {
+    await tx.productView.create({
+      data: { sessionId, type: 'FRONT', versionId, status: 'APPROVED' },
+    });
+    return Promise.all(
+      GENERATED_VIEWS.map((type) => tx.productView.create({ data: { sessionId, type } })),
+    );
   }
 
   private async changeableSession(customer: AuthUser, sessionId: string) {
@@ -225,8 +292,16 @@ export class DesignViewsService {
     return { session, view };
   }
 
+  /** The back content of the task whose final is this front view, if it came from a designer. */
+  private async designerBack(sessionId: string, frontVersionId: string) {
+    const task = await this.prisma.task.findFirst({
+      where: { sessionId, finalVersionId: frontVersionId },
+    });
+    return task ? { description: task.backDescription, fileId: task.backFileId } : undefined;
+  }
+
   private async startJob(
-    customer: AuthUser,
+    customer: { id: string },
     session: { id: string; answers: unknown },
     view: { id: string; type: string; description: string | null },
   ) {
@@ -236,7 +311,7 @@ export class DesignViewsService {
     const answers = session.answers as Answers;
     const built =
       view.type === 'BACK'
-        ? buildBackPrompt(answers)
+        ? buildBackPrompt(answers, await this.designerBack(session.id, front.versionId!))
         : view.type === 'CLOSE_UP'
           ? buildCloseUpPrompt(answers)
           : buildExtraViewPrompt(view.description ?? '');

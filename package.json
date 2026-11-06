@@ -9,9 +9,13 @@
     "db:migrate": "pnpm --filter api prisma:migrate",
     "db:seed": "pnpm --filter api prisma:seed",
     "test": "pnpm --filter api test",
+    "test:e2e": "playwright test",
     "build": "pnpm -r build"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "@playwright/test": "^1.64.1",
+    "@types/pg": "^8.23.1",
+    "concurrently": "^9.2.1",
+    "pg": "^8.23.1"
   }
 }

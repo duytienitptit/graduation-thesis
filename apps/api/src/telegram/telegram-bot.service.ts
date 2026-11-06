@@ -27,6 +27,16 @@ export class TelegramBotService implements OnApplicationBootstrap, OnApplication
     return this.bot?.isInited() ? this.bot.botInfo.username : null;
   }
 
+  /** Plain text, because Telegram refuses buttons that open a localhost address. */
+  async sendText(chatId: string, text: string) {
+    if (!this.bot) throw new Error('Telegram bot is not running');
+    await this.bot.api.sendMessage(chatId, text);
+  }
+
+  taskUrl(taskId: string) {
+    return `${this.config.getOrThrow<string>('WEB_ORIGIN')}/designer/tasks/${taskId}`;
+  }
+
   sendPhoto(
     chatId: string,
     photo: Buffer,
@@ -57,6 +67,7 @@ export class TelegramBotService implements OnApplicationBootstrap, OnApplication
     registerHandlers(bot, {
       link: (code, chatId, username) => this.links.link(code, chatId, username),
       claim: (chatId, taskId) => this.claim(chatId, taskId),
+      taskUrl: (taskId) => this.taskUrl(taskId),
     });
     bot.catch((error) => this.logger.error(`Telegram update failed: ${error.message}`));
     this.bot = bot;

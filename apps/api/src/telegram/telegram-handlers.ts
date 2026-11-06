@@ -12,6 +12,8 @@ export const MESSAGES = {
   designerBusy: 'Bạn đang làm một task khác hoặc đang tạm dừng, nên chưa nhận được task này.',
   notLinked: 'Tài khoản Telegram này chưa liên kết với designer nào.',
   takenNotice: 'Task này đã có người nhận.',
+  openTask: 'Mở trang task để chat với khách:',
+  chatNotice: 'Khách vừa có phản hồi trong task của bạn.',
 };
 
 export const CLAIM_PREFIX = 'claim:';
@@ -34,6 +36,7 @@ const LINK_REPLIES: Record<LinkResult, string> = {
 export interface TelegramActions {
   link(code: string, chatId: string, username?: string): Promise<LinkResult>;
   claim(chatId: string, taskId: string): Promise<ClaimOutcome>;
+  taskUrl(taskId: string): string;
 }
 
 /** Handlers do not care how updates arrive, so polling can become a webhook later. */
@@ -54,7 +57,7 @@ export function registerHandlers(bot: Bot, actions: TelegramActions) {
     });
     if (outcome === 'claimed') {
       await ctx.editMessageReplyMarkup();
-      await ctx.reply(MESSAGES.claimed);
+      await ctx.reply(`${MESSAGES.claimed}\n${MESSAGES.openTask}\n${actions.taskUrl(ctx.match[1])}`);
     }
   });
 }

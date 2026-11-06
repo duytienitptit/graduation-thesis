@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { ErrorNote } from '@/components/error-note';
 import { ProductViews } from '@/components/product-views';
+import { TaskChatPanel } from '@/components/task-chat';
 import { Button } from '@/components/ui/button';
 import {
   ApiError,
@@ -35,20 +36,11 @@ const WAIT_NOTES: Record<NonNullable<DesignTask['waitReason']>, string> = {
 };
 
 function TaskPanel({ task }: { task: DesignTask }) {
-  const assigned = task.status === 'ASSIGNED';
   return (
     <div data-testid="task-panel">
-      <h2 className="overprint text-3xl font-extrabold">
-        {assigned ? 'Đã có designer nhận' : 'Đang tìm designer…'}
-      </h2>
-      {assigned ? (
-        <p className="mt-3">{task.designerName} đã nhận yêu cầu của bạn.</p>
-      ) : (
-        <>
-          <p className="mt-3 text-muted-foreground">Designer làm việc từ 9:00 đến 17:00 mỗi ngày.</p>
-          {task.waitReason && <p className="mt-2">{WAIT_NOTES[task.waitReason]}</p>}
-        </>
-      )}
+      <h2 className="overprint text-3xl font-extrabold">Đang tìm designer…</h2>
+      <p className="mt-3 text-muted-foreground">Designer làm việc từ 9:00 đến 17:00 mỗi ngày.</p>
+      {task.waitReason && <p className="mt-2">{WAIT_NOTES[task.waitReason]}</p>}
       <p className="mt-6 text-sm font-semibold">Yêu cầu của bạn</p>
       <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{task.requirement}</p>
     </div>
@@ -137,13 +129,36 @@ export function DesignStudio({ sessionId, hasLogo, logoPosition }: StudioProps) 
 
   if (workspace.status === 'VIEWS' || workspace.status === 'LOCKED') {
     return (
-      <ProductViews
-        sessionId={sessionId}
-        workspace={workspace}
-        hasLogo={hasLogo}
-        logoPosition={logoPosition}
-        reload={reload}
-      />
+      <>
+        <ProductViews
+          sessionId={sessionId}
+          workspace={workspace}
+          hasLogo={hasLogo}
+          logoPosition={logoPosition}
+          reload={reload}
+        />
+        {workspace.task?.status === 'DONE' && (
+          <details className="mt-10 border-t border-mist pt-4">
+            <summary className="cursor-pointer font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+              Xem lại chat với designer
+            </summary>
+            <TaskChatPanel taskId={workspace.task.id} />
+          </details>
+        )}
+      </>
+    );
+  }
+
+  if (workspace.status === 'DESIGNER' && workspace.task?.status === 'ASSIGNED') {
+    return (
+      <section aria-label="Làm việc với designer" className="mt-8" data-testid="task-panel">
+        <h2 className="overprint text-3xl font-extrabold">Đã có designer nhận</h2>
+        <p className="mt-3">
+          {workspace.task.designerName} đã nhận yêu cầu của bạn. Hai bên trao đổi ở đây. Khi ưng một
+          mẫu, bạn bấm &quot;Đồng ý mẫu này&quot;.
+        </p>
+        <TaskChatPanel taskId={workspace.task.id} withBrief />
+      </section>
     );
   }
 

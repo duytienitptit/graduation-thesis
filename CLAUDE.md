@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-Phases 0 to 6 of `docs/02-implementation-plan.md` are done, with the real two-account Telegram check deferred to the owner. The repo is a pnpm workspace (`apps/api` and `apps/web`).
+Phases 0 to 7 of `docs/02-implementation-plan.md` are done, with the real two-account Telegram check deferred to the owner. The repo is a pnpm workspace (`apps/api` and `apps/web`).
 
 - `pnpm install`, then `pnpm dev` starts everything: services, migrations, seed, API on 4000, web on 3000.
 - `pnpm services:up` starts PostgreSQL (port 5433), Redis (6379) and MinIO (9000, console 9001); `pnpm services:down` stops them.
@@ -14,6 +14,7 @@ Phases 0 to 6 of `docs/02-implementation-plan.md` are done, with the real two-ac
 - If `prisma migrate dev` refuses in a non-interactive shell, write the SQL with `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` and apply it with `prisma migrate deploy`.
 - A killed test run can leave a stray Jest worker and seeded designers set to Busy. Check for both if tests turn flaky.
 - `pnpm test` runs the API tests, which need the services up. `pnpm build` builds.
+- `pnpm test:e2e` runs the Playwright test on its own API (4100) and web (3100), with the bot off, so it can run beside `pnpm dev`. It needs the services up and `pnpm exec playwright install chromium` once.
 - The API is ES modules: relative imports end in `.js`.
 - Every API route needs login unless marked `@Public()`. Limit by role with `@Roles()`, and read the user with `@CurrentUser()`.
 - Push to a user with `RealtimeGateway.emitToUser`. Socket.IO connections need the token in `auth.token`.

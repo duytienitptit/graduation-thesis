@@ -7,10 +7,11 @@ import { DesignImagesService } from './design-images.service.js';
 import { DesignViewsService } from './design-views.service.js';
 import { DesignSessionService } from './design-session.service.js';
 import { DesignController } from './design.controller.js';
+import { TaskCompletionController } from './task-completion.controller.js';
 
 @Module({
   imports: [AiModule, CatalogModule, FilesModule, TaskModule],
-  controllers: [DesignController],
+  controllers: [DesignController, TaskCompletionController],
   providers: [DesignImagesService, DesignSessionService, DesignViewsService],
 })
 export class DesignModule {}
