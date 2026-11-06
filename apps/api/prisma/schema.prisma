@@ -1,0 +1,73 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  DESIGNER
+  MANAGER
+}
+
+// Stand-in for Person 1's accounts. Replaced when their login is connected.
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      Role
+  createdAt DateTime @default(now())
+
+  files          FileObject[]
+  designSessions DesignSession[]
+}
+
+enum FilePurpose {
+  AI_IMAGE
+  REFERENCE
+  CHAT
+  FINAL_DESIGN
+}
+
+enum FileStatus {
+  PENDING
+  READY
+}
+
+// Stand-in for Person 2's file service. Same fields as the overview, plus status.
+model FileObject {
+  id         String      @id @default(uuid())
+  ownerId    String
+  owner      User        @relation(fields: [ownerId], references: [id])
+  storageKey String      @unique
+  mimeType   String
+  size       Int
+  purpose    FilePurpose
+  status     FileStatus  @default(PENDING)
+  createdAt  DateTime    @default(now())
+
+  @@index([ownerId])
+}
+
+enum DesignSessionStatus {
+  ANSWERING
+  ANSWERED
+}
+
+model DesignSession {
+  id           String              @id @default(uuid())
+  customerId   String
+  customer     User                @relation(fields: [customerId], references: [id])
+  /// Copy of the chosen product and specs, so catalog changes never alter a session.
+  specSnapshot Json
+  answers      Json                @default("{}")
+  status       DesignSessionStatus @default(ANSWERING)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([customerId])
+}

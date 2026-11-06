@@ -1,0 +1,109 @@
+%% Original diagram 2: Assignment for 3 people (blue = Person 1, green = Person 2, orange = Person 3)
+flowchart TD
+    subgraph P1["PERSON 1 — ACCOUNTS, PRODUCTS AND ORDERS"]
+        direction TB
+        AUTH["Accounts and permissions<br/>Customer · Designer · Manager"]
+        PRODUCT["Choose product type and model"]
+        SPEC["Choose specs, quantity<br/>View price and estimated total"]
+        REVIEW["Review locked design,<br/>product, specs and quantity"]
+        CONTACT["Enter required phone number<br/>and contact details"]
+        ORDER["Submit order request<br/>Save price at order time"]
+        CALL["Manager calls customer to confirm"]
+        RESULT{"Contact result"}
+        RETRY["Not reached<br/>Record for callback"]
+        CHANGE["Adjust information<br/>Agree again with customer"]
+        CANCEL["Cancel order and record the reason"]
+        CONFIRM["Lock order"]
+        HANDOVER["Check file<br/>Hand over to production"]
+
+        ADMIN1["Administer accounts,<br/>products, specs and prices"]
+        DASH["Main dashboard shell<br/>User and order statistics"]
+
+        AUTH --> PRODUCT --> SPEC
+        REVIEW --> CONTACT --> ORDER --> CALL --> RESULT
+        RESULT -->|"Not reached"| RETRY --> CALL
+        RESULT -->|"Needs adjustment"| CHANGE --> CALL
+        RESULT -->|"Customer cancels"| CANCEL
+        RESULT -->|"Customer confirms"| CONFIRM --> HANDOVER
+        ADMIN1 -.-> AUTH
+        ADMIN1 -.-> PRODUCT
+        ADMIN1 -.-> SPEC
+        ORDER -.-> DASH
+    end
+
+    subgraph P2["PERSON 2 — AI DESIGN AND FILE STORAGE"]
+        direction TB
+        PROMPT["Customer enters prompt<br/>or edit request"]
+        AI["Processing queue<br/>Call image create or edit API"]
+        PREVIEW["Show and save design version"]
+        CHOICE{"Customer choice"}
+        AIFINAL["Save locked AI design"]
+        FILE["Shared file service<br/>Upload · Store in R2/S3 · Check download permission"]
+        ADMIN2["AI admin and statistics<br/>Image history, errors and usage"]
+
+        PROMPT --> AI --> PREVIEW --> CHOICE
+        CHOICE -->|"Ask AI to edit"| PROMPT
+        CHOICE -->|"Lock AI sample"| AIFINAL
+        FILE -.-> PREVIEW
+        AI -.-> ADMIN2
+    end
+
+    subgraph P3["PERSON 3 — DESIGNER, TASK, TELEGRAM AND CHAT"]
+        direction TB
+        TASK["Create design task<br/>With requirements and reference sample"]
+        QUEUE["Put task in the queue"]
+        FREE{"Any designer free?"}
+        WAIT["Wait for an available designer"]
+        TELEGRAM["Send Telegram to free designers"]
+        ACCEPT["Designer presses Take task"]
+        CHECK{"Task still open<br/>and designer still free?"}
+        REJECT["Reject<br/>Report the reason"]
+        ASSIGN["Confirm first taker<br/>Switch designer to Busy"]
+        CLOSE["Close for other designers<br/>Update Telegram messages"]
+        CHAT["Customer and designer<br/>chat in the system"]
+        SAMPLE["Designer sends design sample"]
+        APPROVE{"Customer approves sample?"}
+        FEEDBACK["Customer sends edit request"]
+        FINAL["Send final to the system<br/>Complete task"]
+        AVAILABLE["Designer returns to Free"]
+
+        ADMIN3["Administer designers, Telegram links<br/>Monitor tasks and handle exceptions"]
+        STATS3["Designer, task<br/>and progress statistics"]
+
+        TASK --> QUEUE --> FREE
+        FREE -->|"No"| WAIT
+        WAIT -->|"A designer is available"| FREE
+        FREE -->|"Yes"| TELEGRAM --> ACCEPT --> CHECK
+        CHECK -->|"No"| REJECT
+        CHECK -->|"Yes"| ASSIGN --> CLOSE --> CHAT
+        CHAT --> SAMPLE --> APPROVE
+        APPROVE -->|"Needs edits"| FEEDBACK --> CHAT
+        APPROVE -->|"Agree"| FINAL --> AVAILABLE
+        AVAILABLE -.->|"Check waiting tasks"| QUEUE
+        ADMIN3 -.-> QUEUE
+        ADMIN3 -.-> TELEGRAM
+        FINAL -.-> STATS3
+    end
+
+    SPEC --> PROMPT
+    CHOICE -->|"Need a real designer"| TASK
+    AIFINAL --> REVIEW
+    FINAL --> REVIEW
+
+    FILE -.->|"Stores chat and design files"| SAMPLE
+    AUTH -.->|"Authentication and permissions"| CHAT
+    AUTH -.->|"Authenticates designer"| ACCEPT
+    ADMIN2 -.->|"AI figures"| DASH
+    STATS3 -.->|"Task figures"| DASH
+
+    HANDOVER --> PRODUCTION["PRODUCTION<br/>Receives locked order"]
+
+    classDef person1 fill:#DBEAFE,stroke:#2563EB,color:#111827
+    classDef person2 fill:#DCFCE7,stroke:#16A34A,color:#111827
+    classDef person3 fill:#FFEDD5,stroke:#EA580C,color:#111827
+    classDef external fill:#F3F4F6,stroke:#6B7280,color:#111827
+
+    class AUTH,PRODUCT,SPEC,REVIEW,CONTACT,ORDER,CALL,RESULT,RETRY,CHANGE,CANCEL,CONFIRM,HANDOVER,ADMIN1,DASH person1
+    class PROMPT,AI,PREVIEW,CHOICE,AIFINAL,FILE,ADMIN2 person2
+    class TASK,QUEUE,FREE,WAIT,TELEGRAM,ACCEPT,CHECK,REJECT,ASSIGN,CLOSE,CHAT,SAMPLE,APPROVE,FEEDBACK,FINAL,AVAILABLE,ADMIN3,STATS3 person3
+    class PRODUCTION external

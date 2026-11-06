@@ -1,0 +1,17 @@
+{
+  "name": "shirt-design",
+  "private": true,
+  "packageManager": "pnpm@12.14.0",
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "services:up": "docker compose up -d --wait",
+    "services:down": "docker compose down",
+    "db:migrate": "pnpm --filter api prisma:migrate",
+    "db:seed": "pnpm --filter api prisma:seed",
+    "test": "pnpm --filter api test",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

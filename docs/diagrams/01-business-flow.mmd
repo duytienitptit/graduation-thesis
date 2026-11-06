@@ -1,0 +1,114 @@
+%% Original diagram 1: Overall business flow (by role)
+flowchart TD
+    START([Start]) --> U1
+
+    subgraph USER["CUSTOMER"]
+        U1["Choose product type and model"]
+        U2["Choose specs and quantity<br/>Material, colour, size…"]
+        U3["View unit price and estimated total"]
+        U4["Chat with AI to describe the idea"]
+        U5["View AI design sample"]
+        U6{"Customer choice"}
+        U7["Enter edit request for AI"]
+        U8["Create task to work with a designer"]
+        U9["Chat with designer in the system"]
+        U10["View designer sample"]
+        U11{"Approve designer sample?"}
+        U12["Send edit request"]
+        U13["Lock design"]
+        U14["Review product, design,<br/>specs, quantity and price"]
+        U15["Enter required phone number<br/>Contact name and notes if any"]
+        U16["Submit order request"]
+    end
+
+    subgraph AI["AI DESIGN"]
+        A1["Create or edit design<br/>per customer request"]
+    end
+
+    subgraph TASK["AUTOMATIC TASK DISPATCH"]
+        T1["Save task to the queue"]
+        T2{"Any designer free?"}
+        T3["Wait for an available designer"]
+        T4["Send Telegram notification<br/>to free designers"]
+        T5{"Task still open<br/>and designer still free?"}
+        T6["Confirm first designer<br/>Assign task and switch to Busy"]
+        T7["Close for other designers<br/>Update Telegram messages"]
+        T8["Reject taking the task<br/>Report the reason"]
+        T9["Save final design<br/>Complete task"]
+        T10["Switch designer to Free"]
+    end
+
+    subgraph DESIGNER["DESIGNER"]
+        D1["Receive Telegram notification"]
+        D2["Press Take task"]
+        D3["Receive request<br/>Chat with customer in the system"]
+        D4["Design or edit<br/>and send sample"]
+        D5["Send final to the system<br/>after customer approval"]
+    end
+
+    subgraph ORDER["ORDER INTAKE AND STORAGE"]
+        O1["Create order as Awaiting contact<br/>Save price at order time"]
+        O2["Save contact, change<br/>and confirmation history"]
+    end
+
+    subgraph ADMIN["SYSTEM MANAGER"]
+        M0["Log in to admin pages"]
+        M1["Statistics dashboard<br/>Users, designers, AI, tasks and orders"]
+        M2["Manage accounts and permissions<br/>Users, designers, Telegram links"]
+        M3["Manage products and prices<br/>Models, specs and pricing rules"]
+        M4["Monitor AI, tasks and notifications<br/>Handle slow, cancelled or requeued tasks"]
+        M5["Support, complaints<br/>and system logs"]
+        M6["Receive order and call the customer"]
+        M7{"Contact result"}
+        M8["Record not reached<br/>Schedule a callback"]
+        M9["Adjust information<br/>Agree again with customer"]
+        M10["Cancel order and record the reason"]
+        M11["Confirm and lock order"]
+        M12["Check file and hand over<br/>Locked design, specs, quantity and price"]
+    end
+
+    subgraph PRODUCTION["PRODUCTION"]
+        P1["Receive locked order<br/>and production file"]
+    end
+
+    U1 --> U2 --> U3 --> U4
+    U4 --> A1 --> U5 --> U6
+    U6 -->|"Edit with AI"| U7
+    U7 --> A1
+    U6 -->|"Work with a designer"| U8
+    U6 -->|"Choose AI sample"| U13
+
+    U8 --> T1 --> T2
+    T2 -->|"No"| T3
+    T3 -->|"A designer is available"| T2
+    T2 -->|"Yes"| T4 --> D1 --> D2 --> T5
+    T5 -->|"No"| T8
+    T5 -->|"Yes"| T6 --> T7 --> D3
+    D3 --> U9
+    U9 --> D4 --> U10 --> U11
+    U11 -->|"Needs edits"| U12 --> D3
+    U11 -->|"Agree"| U13
+    U13 -->|"Designer sample"| D5 --> T9 --> T10
+    T10 -.->|"Check waiting tasks"| T2
+
+    U13 --> U14 --> U15 --> U16 --> O1
+    O1 --> M6 --> M7
+    M7 -->|"Not reached"| M8 --> M6
+    M7 -->|"Needs adjustment"| M9 --> M6
+    M7 -->|"Customer cancels"| M10
+    M7 -->|"Customer confirms"| M11 --> M12 --> P1
+    M8 -.-> O2
+    M9 -.-> O2
+    M10 -.-> O2
+    M11 -.-> O2
+
+    M0 --> M1
+    M0 --> M2
+    M0 --> M3
+    M0 --> M4
+    M0 --> M5
+    M0 --> M6
+    M3 -.->|"Supplies catalog and prices"| U1
+    M3 -.-> U3
+    M2 -.->|"Manages task eligibility"| T2
+    M4 -.->|"Monitors and handles exceptions"| T1
