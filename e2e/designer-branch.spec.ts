@@ -251,3 +251,142 @@ test('a task goes from the customer through a designer to a locked product', asy
     await designer.screenshot({ path: 'test-results/designer-area.png', fullPage: true });
   });
 });
+
+async function workspaceOf(request: APIRequestContext, token: string, sessionId: string) {
+  const res = await request.get(`${API}/design/sessions/${sessionId}/workspace`, {
+    headers: auth(token),
+  });
+  return res.json();
+}
+
+/** The customer chose the AI image, and the fake provider made the back and close-up. */
+async function sessionAtViews(request: APIRequestContext, token: string) {
+  const sessionId = await sessionWithImage(request, token);
+  await expect
+    .poll(async () => (await workspaceOf(request, token, sessionId)).versions.length)
+    .toBe(1);
+  const { versions } = await workspaceOf(request, token, sessionId);
+  const chosen = await request.post(`${API}/design/sessions/${sessionId}/main-image`, {
+    headers: auth(token),
+    data: { versionId: versions[0].id },
+  });
+  expect(chosen.ok()).toBe(true);
+  await expect
+    .poll(async () =>
+      (await workspaceOf(request, token, sessionId)).views
+        .map((view: { status: string }) => view.status)
+        .sort()
+        .join(),
+    )
+    .toBe('APPROVED,READY,READY');
+  return sessionId;
+}
+
+async function claimLatest(
+  request: APIRequestContext,
+  tokens: { customer: string; designer: string },
+  taskId: string,
+) {
+  const claimed = await request.post(`${API}/tasks/${taskId}/dev-claim`, {
+    headers: auth(tokens.designer),
+  });
+  expect(claimed.ok()).toBe(true);
+}
+
+test('a designer redoes one view, and the customer approves it and locks', async ({
+  browser,
+  request,
+}) => {
+  const tokens = {
+    customer: await tokenFor(request, CUSTOMER.email),
+    designer: await tokenFor(request, DESIGNER.email),
+  };
+  const sessionId = await sessionAtViews(request, tokens.customer);
+  const customer = await open(browser, CUSTOMER.name);
+  const designer = await open(browser, DESIGNER.name);
+  await customer.goto(`/design/${sessionId}`);
+
+  const back = customer.getByTestId('view-BACK');
+  await expect(customer.getByTestId('view-FRONT').getByRole('button', { name: 'Nhờ designer' })).toHaveCount(0);
+  await back.getByRole('button', { name: 'Nhờ designer' }).click();
+  await back.getByLabel('Góc này cần sửa gì?').fill('Chữ ở lưng bị lệch');
+  await back.getByRole('button', { name: 'Gửi cho designer' }).click();
+  await expect(back.getByText('Đang tìm designer')).toBeVisible();
+  await expect(customer.getByRole('button', { name: 'Chốt sản phẩm' })).toBeDisabled();
+
+  const { views } = await workspaceOf(request, tokens.customer, sessionId);
+  const backTask = views.find((view: { type: string }) => view.type === 'BACK').task;
+  await claimLatest(request, tokens, backTask.id);
+  await expect(back.getByText('Designer đang làm góc này')).toBeVisible();
+
+  await designer.goto(`/designer/tasks/${backTask.id}`);
+  await expect(designer.getByText('Chỉ làm một góc: mặt sau.')).toBeVisible();
+  await say(designer, 'Mình sửa chữ cho thẳng nhé');
+  await expect(customer.getByText('Mình sửa chữ cho thẳng nhé')).toBeVisible();
+  await customer.screenshot({ path: 'test-results/view-task-open.png', fullPage: true });
+
+  await designer.getByTestId('final-image').setInputFiles(image('lung.png', 15, 27, 61));
+  await designer.getByRole('button', { name: 'Gửi bản cuối' }).click();
+  await designer.getByRole('button', { name: 'Hoàn thành', exact: true }).click();
+  await designer.getByRole('button', { name: 'Xác nhận hoàn thành' }).click();
+  await expect(designer.getByRole('status').filter({ hasText: 'Task đã hoàn thành.' })).toBeVisible();
+
+  await expect(back.getByText('Designer đang làm góc này')).toHaveCount(0);
+  await back.getByRole('button', { name: 'Duyệt' }).click();
+  const closeUp = customer.getByTestId('view-CLOSE_UP');
+  await closeUp.getByRole('button', { name: 'Duyệt' }).click();
+  await expect(closeUp.getByText('Đã duyệt')).toBeVisible();
+  await customer.getByRole('button', { name: 'Chốt sản phẩm' }).click();
+  await customer.getByRole('button', { name: 'Chốt sản phẩm' }).click();
+  await expect(customer.getByText('Sản phẩm đã được chốt.')).toBeVisible();
+
+  const { lockedProductId } = await workspaceOf(request, tokens.customer, sessionId);
+  const locked = await (
+    await request.get(`${API}/design/locked-products/${lockedProductId}`, {
+      headers: auth(tokens.customer),
+    })
+  ).json();
+  const lockedBack = locked.views.find((view: { type: string }) => view.type === 'BACK');
+  expect(lockedBack.source).toBe('DESIGNER');
+  await customer.screenshot({ path: 'test-results/view-task-locked.png', fullPage: true });
+});
+
+test('a designer closes a task with a reason, and the customer can go on with AI', async ({
+  browser,
+  request,
+}) => {
+  const tokens = {
+    customer: await tokenFor(request, CUSTOMER.email),
+    designer: await tokenFor(request, DESIGNER.email),
+  };
+  const sessionId = await sessionWithImage(request, tokens.customer);
+  const customer = await open(browser, CUSTOMER.name);
+  const designer = await open(browser, DESIGNER.name);
+
+  await customer.goto(`/design/${sessionId}`);
+  await customer.getByRole('button', { name: 'Cần designer hỗ trợ' }).click();
+  await customer.getByLabel('Bạn cần designer giúp gì?').fill('Đổi màu nền');
+  await customer.getByRole('button', { name: 'Gửi cho designer' }).click();
+  await expect(customer.getByTestId('task-waiting')).toBeVisible();
+  await expect(customer.getByText('bạn có thể hủy yêu cầu')).toBeVisible();
+
+  const { task } = await workspaceOf(request, tokens.customer, sessionId);
+  await claimLatest(request, tokens, task.id);
+  await designer.goto(`/designer/tasks/${task.id}`);
+
+  await designer.getByText('Khách không phản hồi? Đóng task').click();
+  await designer.getByLabel('Lý do đóng').fill('Khách không trả lời sau 3 ngày');
+  await designer.getByRole('button', { name: 'Đóng task' }).click();
+  await designer.getByRole('button', { name: 'Xác nhận đóng task' }).click();
+  await expect(designer.getByText('Task đã đóng. Lý do: Khách không trả lời sau 3 ngày')).toBeVisible();
+
+  await expect(
+    customer.getByText('Designer đã đóng yêu cầu với lý do: "Khách không trả lời sau 3 ngày".'),
+  ).toBeVisible();
+  await expect(customer.getByRole('button', { name: 'Sửa bằng AI' })).toBeVisible();
+  await expect(customer.getByRole('button', { name: 'Cần designer hỗ trợ' })).toBeVisible();
+  await customer.screenshot({ path: 'test-results/customer-after-close.png', fullPage: true });
+
+  await designer.goto('/designer');
+  await expect(designer.getByText('Rảnh')).toBeVisible();
+});

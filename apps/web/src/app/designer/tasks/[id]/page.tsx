@@ -45,6 +45,19 @@ export default function DesignerTaskPage() {
               , size {task.product.size}, số lượng {task.product.quantity}
             </p>
 
+            {task.targetView && (
+              <p className="mt-4 border-l-4 border-cobalt pl-3 font-medium">
+                Chỉ làm một góc: {task.targetView.label}. Mặt trước khách đã chốt, ảnh của bạn sẽ vào
+                góc này để khách duyệt.
+              </p>
+            )}
+
+            {task.status === 'CLOSED' && (
+              <p role="status" className="mt-4 border-l-4 border-cobalt pl-3 font-medium">
+                Task đã đóng. Lý do: {task.closeReason}
+              </p>
+            )}
+
             {task.status === 'DONE' && (
               <p role="status" className="mt-4 border-l-4 border-cobalt pl-3 font-medium">
                 Task đã hoàn thành. Bạn đã trở lại trạng thái rảnh nếu không bị tạm dừng.
@@ -65,7 +78,9 @@ export default function DesignerTaskPage() {
                   {task.requirement}
                 </p>
 
-                <h2 className="mt-6 font-semibold">Ảnh AI khách gửi</h2>
+                <h2 className="mt-6 font-semibold">
+                  {task.targetView ? 'Mặt trước khách đã chốt' : 'Ảnh AI khách gửi'}
+                </h2>
                 {/* eslint-disable-next-line @next/next/no-img-element -- expiring storage link */}
                 <img
                   src={task.referenceImageUrl}

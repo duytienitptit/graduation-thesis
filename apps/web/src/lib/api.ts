@@ -172,15 +172,25 @@ export interface ProductView {
   description: string | null;
   jobStatus: 'QUEUED' | 'RUNNING' | 'DONE' | 'FAILED' | null;
   imageUrl: string | null;
+  /** The latest designer task for this view, if any. */
+  task: DesignTask | null;
 }
+
+export type TaskStatus = 'WAITING' | 'ASSIGNED' | 'DONE' | 'CANCELLED' | 'CLOSED';
 
 export interface DesignTask {
   id: string;
-  status: 'WAITING' | 'ASSIGNED' | 'DONE';
+  status: TaskStatus;
   requirement: string;
   designerName: string | null;
   waitReason: 'out-of-hours' | 'no-free-designer' | null;
+  noTakerNotice: boolean;
+  cancellableAt: string;
+  closeReason: string | null;
 }
+
+export const isOpenTask = (task: DesignTask | null | undefined) =>
+  task?.status === 'WAITING' || task?.status === 'ASSIGNED';
 
 export interface Workspace {
   status: SessionStatus;
@@ -207,6 +217,17 @@ export const editImage = (id: string, versionId: string, request: string) =>
     body: JSON.stringify({ versionId, request }),
   });
 
+export const createViewTask = (id: string, viewId: string, requirement: string) =>
+  api<unknown>(`/design/sessions/${id}/views/${viewId}/tasks`, {
+    method: 'POST',
+    body: JSON.stringify({ requirement }),
+  });
+
+export const cancelTask = (id: string) => api<void>(`/tasks/${id}/cancel`, { method: 'POST' });
+
+export const closeTask = (id: string, reason: string) =>
+  api<void>(`/tasks/${id}/close`, { method: 'POST', body: JSON.stringify({ reason }) });
+
 export const createTask = (id: string, versionId: string, requirement: string) =>
   api<unknown>(`/design/sessions/${id}/tasks`, {
     method: 'POST',
@@ -229,6 +250,8 @@ export interface DesignerTaskRow {
   customerName: string;
   assignedAt: string | null;
   doneAt: string | null;
+  closedAt: string | null;
+  viewLabel: string | null;
 }
 
 export const getDesignerTasks = () =>
@@ -242,6 +265,8 @@ export interface TaskDetail {
   requirement: string;
   customerName: string;
   designerName: string | null;
+  closeReason: string | null;
+  targetView: { type: string; label: string } | null;
   product: { name: string; colour: string; material: string; size: string; quantity: number };
   referenceImageUrl: string;
   answers: { id: string; label: string; text: string }[];

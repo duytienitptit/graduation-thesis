@@ -33,7 +33,7 @@ export class TaskDispatchService {
     const dayKey = vietnamDayKey(now);
     for (const task of tasks) {
       for (const designer of designers) {
-        if (this.sender.canReach(designer)) await this.notify(task, designer, dayKey);
+        if (this.sender.canReach(designer)) await this.notify(task, designer, dayKey, now);
       }
     }
   }
@@ -42,10 +42,11 @@ export class TaskDispatchService {
     task: { id: string; requirement: string },
     designer: { id: string; telegramChatId: string | null },
     dayKey: string,
+    now: Date,
   ) {
     // The unique row is the claim to send, so two dispatches cannot send the same message.
     const notice = await this.prisma.taskNotice
-      .create({ data: { taskId: task.id, designerId: designer.id, dayKey } })
+      .create({ data: { taskId: task.id, designerId: designer.id, dayKey, sentAt: now } })
       .catch(() => null);
     if (!notice) return;
 

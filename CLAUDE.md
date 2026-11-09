@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-Phases 0 to 7 of `docs/02-implementation-plan.md` are done, with the real two-account Telegram check deferred to the owner. The repo is a pnpm workspace (`apps/api` and `apps/web`).
+Phases 0 to 8 of `docs/02-implementation-plan.md` are done, with the real two-account Telegram check deferred to the owner. The repo is a pnpm workspace (`apps/api` and `apps/web`).
 
 - `pnpm install`, then `pnpm dev` starts everything: services, migrations, seed, API on 4000, web on 3000.
 - `pnpm services:up` starts PostgreSQL (port 5433), Redis (6379) and MinIO (9000, console 9001); `pnpm services:down` stops them.
@@ -18,7 +18,7 @@ Phases 0 to 7 of `docs/02-implementation-plan.md` are done, with the real two-ac
 - The API is ES modules: relative imports end in `.js`.
 - Every API route needs login unless marked `@Public()`. Limit by role with `@Roles()`, and read the user with `@CurrentUser()`.
 - Push to a user with `RealtimeGateway.emitToUser`. Socket.IO connections need the token in `auth.token`.
-- Tests use their own queue prefix (`apps/api/jest.setup.cjs`), so a running dev worker never takes their jobs.
+- Tests use their own queue prefix (`apps/api/jest.setup.cjs`), so a running dev worker never takes their jobs. They also set `TASK_CHECKS_ENABLED=false` and call `TaskChecksService.run` with a scope of their own tasks, because the 10-minute check would otherwise touch every task in the shared database with a fixed clock.
 - `IMAGE_PROVIDER=fake` is the default and costs nothing; `nano-banana` calls Google and costs money.
 - `TELEGRAM_ENABLED=true` runs the bot by long polling. One running copy per token.
 - Copy `.env.example` to `.env`. Keys go only in `.env`, which is git-ignored.

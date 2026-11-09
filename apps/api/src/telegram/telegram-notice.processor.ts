@@ -46,7 +46,7 @@ export class TelegramNoticeProcessor extends WorkerHost {
     );
   }
 
-  private async markTaken(job: Job<{ noticeId: string }>) {
+  private async markTaken(job: Job<{ noticeId: string; reason?: string }>) {
     const notice = await this.prisma.taskNotice.findUnique({
       where: { id: job.data.noticeId },
       include: { designer: true },
@@ -57,7 +57,7 @@ export class TelegramNoticeProcessor extends WorkerHost {
     await this.bot.replaceNotice(
       notice.designer.telegramChatId,
       Number(notice.externalId),
-      MESSAGES.takenNotice,
+      job.data.reason === 'cancelled' ? MESSAGES.cancelledNotice : MESSAGES.takenNotice,
     );
   }
 
@@ -65,7 +65,7 @@ export class TelegramNoticeProcessor extends WorkerHost {
     const notice = await this.prisma.taskNotice.findUnique({
       where: { id: job.data.noticeId },
       include: {
-        task: { include: { session: true, referenceVersion: true } },
+        task: { include: { session: true, referenceVersion: true, targetView: true } },
         designer: true,
       },
     });
@@ -77,11 +77,12 @@ export class TelegramNoticeProcessor extends WorkerHost {
       return;
     }
 
-    const { session, referenceVersion, requirement } = notice.task;
+    const { session, referenceVersion, requirement, targetView } = notice.task;
     const caption = taskSummary(
       session.specSnapshot as unknown as SpecSnapshot,
       session.answers as unknown as Answers,
       requirement,
+      targetView,
     );
 
     try {

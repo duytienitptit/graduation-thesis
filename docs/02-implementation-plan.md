@@ -184,12 +184,35 @@ Steps (the owner reviews each one before the next):
 
 Done 2026-11-06. `pnpm test:e2e` runs the path in Chromium on its own API and web, with the bot off and fake images. The task is claimed through the `dev-claim` route, because a browser cannot press the Telegram button. Not verified: the bot's link after a real claim, a real Telegram notice for a customer message, and a real image of a back made from designer content.
 
-### ⬜ Phase 8 — Exceptions
+### ✅ Phase 8 — Exceptions
 - Customer notices when nobody takes a task, daily re-send, cancel after 48 hours.
 - 24-hour silence alert, designer closes a task when the customer is silent.
 - Choosing a designer at the view step: new task naming the view, the designer's image replaces it.
 
+The daily re-send at 9:00 and the notice at creation already work since phase 5, with fixed-clock tests.
+
+Owner's choices (2026-11-09):
+- The "nobody took it" notice counts working hours only, from the first Telegram message, and shows on the customer's design page, live.
+- After the customer cancels or the designer closes, the session returns to AI editing, where the customer can edit or create a new task.
+- Designer silence counts 24 hours straight, only while it is the designer's turn: from the claim if the designer has written nothing, or from the customer's oldest message or "Agree" the designer has not answered. The alert is stored on the task and pushed live to managers; the manager screen comes in phase 9.
+- The designer can close a task at any time, with a required reason that the customer and the manager see.
+- A view task is for an unapproved view other than the front. It has no "Agree" and no back content: the designer sends the view's image and presses "Done", and the image enters that view for the customer to approve. Other views stay usable, and the product cannot be locked while the view task is open.
+- The check runs every 10 minutes, so notices can arrive up to about 10 minutes late.
+
+Steps (the owner reviews each one before the next):
+- ✅ 8.1 Task statuses for cancelled and closed tasks, and fields for the close reason, the target view and sent notices
+- ✅ 8.2 A check that runs every 10 minutes, testable with a fixed clock
+- ✅ 8.3 Tell the customer once when nobody takes a task within 2 working hours of the first Telegram message
+- ✅ 8.4 The customer cancels a task untaken for 48 hours; the designers' Telegram messages change to "cancelled"
+- ✅ 8.5 Alert the manager after 24 hours of designer silence while the customer waits
+- ✅ 8.6 The designer closes a task with a reason when the customer is silent, and returns to Free
+- ✅ 8.7 A task for one view: created from the views step, its final replaces that view's image for approval
+- ✅ 8.8 Web: the customer's notices, cancel button and closed state, the view's designer button, and the designer's close form
+- ✅ 8.9 A test over every way a task ends, showing no designer stays Busy, then the "Done when" check in a real browser
+
 **Done when:** each rule has a test with a fixed clock, and no path leaves a designer stuck in Busy.
+
+Done 2026-11-09. `task-exceptions.spec.ts` covers each rule with a fixed clock, and every way a taken task ends (Done on a whole-shirt task, Done on a view task, the designer's close) frees the designer. `pnpm test:e2e` adds a view task and a close to the happy path. Not verified: the real Telegram "cancelled" edit, and the alert reaching a manager on screen, which comes with phase 9.
 
 ### ⬜ Phase 9 — Manager tools and statistics
 - Designer list and states, Telegram links, slow tasks, cancel, return to queue with chat kept.

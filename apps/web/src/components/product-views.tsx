@@ -2,12 +2,16 @@
 
 import { FormEvent, useState } from 'react';
 import { ErrorNote } from '@/components/error-note';
+import { TaskChatPanel } from '@/components/task-chat';
+import { TaskWaiting } from '@/components/task-waiting';
 import { Button } from '@/components/ui/button';
 import {
   addExtraView,
   ApiError,
   approveView,
+  createViewTask,
   generateView,
+  isOpenTask,
   lockProduct,
   ProductView,
   regenerateView,
@@ -47,6 +51,8 @@ export function ProductViews({
   const [error, setError] = useState<string | null>(null);
   const [extra, setExtra] = useState('');
   const [confirmingLock, setConfirmingLock] = useState(false);
+  const [askingFor, setAskingFor] = useState<string | null>(null);
+  const [requirement, setRequirement] = useState('');
 
   const { usage, status } = workspace;
   const locked = status === 'LOCKED';
@@ -61,6 +67,7 @@ export function ProductViews({
     (view) => view.jobStatus === 'QUEUED' || view.jobStatus === 'RUNNING',
   );
   const noCredits = usage.remaining === 0;
+  const withDesigner = views.filter((view) => isOpenTask(view.task));
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -74,11 +81,22 @@ export function ProductViews({
       setError(
         failure.code === 'daily-limit'
           ? 'Bạn đã hết lượt hôm nay. Hãy quay lại sau 00:00.'
-          : failure.message,
+          : failure.code === 'view-with-designer'
+            ? 'Góc này đang có designer làm. Hãy chờ designer xong.'
+            : failure.message,
       );
       return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function submitViewTask(event: FormEvent, viewId: string) {
+    event.preventDefault();
+    if (!requirement.trim()) return;
+    if (await run(() => createViewTask(sessionId, viewId, requirement))) {
+      setAskingFor(null);
+      setRequirement('');
     }
   }
 
@@ -113,6 +131,9 @@ export function ProductViews({
           const generating = view.jobStatus === 'QUEUED' || view.jobStatus === 'RUNNING';
           const failed = view.jobStatus === 'FAILED';
           const label = viewLabel(view, hasLogo);
+          const designerOpen = isOpenTask(view.task);
+          const canAskDesigner =
+            view.type !== 'FRONT' && view.status !== 'APPROVED' && !generating && !designerOpen;
           return (
             <li key={view.id} data-testid={`view-${view.type}`}>
               <div className="relative flex aspect-square items-center justify-center overflow-hidden border border-mist bg-white">
@@ -132,6 +153,14 @@ export function ProductViews({
                     Đang tạo ảnh…
                   </p>
                 )}
+                {designerOpen && (
+                  <p
+                    role="status"
+                    className="absolute inset-x-0 bottom-0 bg-ink px-3 py-2 text-center text-sm font-medium text-white"
+                  >
+                    {view.task!.status === 'ASSIGNED' ? 'Designer đang làm góc này' : 'Đang tìm designer'}
+                  </p>
+                )}
               </div>
 
               <div className="mt-2 flex items-baseline justify-between gap-3">
@@ -141,13 +170,18 @@ export function ProductViews({
                 )}
               </div>
 
-              {failed && (
+              {failed && !designerOpen && (
                 <p role="alert" className="mt-1 text-sm text-magenta">
                   Không tạo được ảnh. Lượt này không bị tính.
                 </p>
               )}
+              {view.task?.status === 'CLOSED' && view.status !== 'APPROVED' && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Designer đã đóng yêu cầu: {view.task.closeReason}
+                </p>
+              )}
 
-              {!locked && !generating && (
+              {!locked && !generating && !designerOpen && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {view.status === 'READY' && (
                     <>
@@ -177,12 +211,76 @@ export function ProductViews({
                       Tạo ảnh góc này
                     </Button>
                   )}
+                  {canAskDesigner && askingFor !== view.id && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => {
+                        setAskingFor(view.id);
+                        setRequirement('');
+                      }}
+                    >
+                      Nhờ designer
+                    </Button>
+                  )}
                 </div>
+              )}
+
+              {!locked && askingFor === view.id && canAskDesigner && (
+                <form onSubmit={(event) => void submitViewTask(event, view.id)} className="mt-3">
+                  <label htmlFor={`view-task-${view.id}`} className="text-sm font-semibold">
+                    Góc này cần sửa gì?
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Miễn phí. Designer nhận mặt trước đã chọn và câu trả lời của bạn.
+                  </p>
+                  <textarea
+                    id={`view-task-${view.id}`}
+                    rows={3}
+                    maxLength={2000}
+                    value={requirement}
+                    onChange={(event) => setRequirement(event.target.value)}
+                    className="mt-2 block w-full border border-mist bg-white px-3 py-2 text-sm outline-none focus-visible:border-cobalt focus-visible:ring-3 focus-visible:ring-ring/50"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" type="submit" disabled={busy || !requirement.trim()}>
+                      Gửi cho designer
+                    </Button>
+                    <Button size="sm" type="button" variant="outline" onClick={() => setAskingFor(null)}>
+                      Thôi
+                    </Button>
+                  </div>
+                </form>
               )}
             </li>
           );
         })}
       </ul>
+
+      {withDesigner.map((view) => (
+        <section
+          key={view.id}
+          aria-label={`Designer làm góc ${viewLabel(view, hasLogo).toLowerCase()}`}
+          className="mt-10 border-t border-mist pt-6"
+          data-testid={`view-task-${view.type}`}
+        >
+          {view.task!.status === 'WAITING' ? (
+            <TaskWaiting
+              task={view.task!}
+              title={`Đang tìm designer cho ${viewLabel(view, hasLogo).toLowerCase()}`}
+              onChange={reload}
+            />
+          ) : (
+            <>
+              <h2 className="overprint text-3xl font-extrabold">
+                {view.task!.designerName} đang làm {viewLabel(view, hasLogo).toLowerCase()}
+              </h2>
+              <TaskChatPanel taskId={view.task!.id} />
+            </>
+          )}
+        </section>
+      ))}
 
       {!locked && (
         <>
@@ -240,11 +338,16 @@ export function ProductViews({
               <>
                 <Button
                   size="lg"
-                  disabled={!allApproved || working}
+                  disabled={!allApproved || working || withDesigner.length > 0}
                   onClick={() => setConfirmingLock(true)}
                 >
                   Chốt sản phẩm
                 </Button>
+                {withDesigner.length > 0 && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Đang có designer làm một góc. Chốt được khi designer làm xong.
+                  </p>
+                )}
                 {!allApproved && (
                   <p className="mt-2 text-sm text-muted-foreground">
                     Hãy duyệt đủ mặt trước, mặt sau và ảnh cận để chốt.

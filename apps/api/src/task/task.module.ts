@@ -12,6 +12,7 @@ import {
 import { DesignersController } from './designers.controller.js';
 import { DesignersService } from './designers.service.js';
 import { TaskAccessService } from './task-access.service.js';
+import { TaskChecksService } from './task-checks.service.js';
 import { TaskDetailsService } from './task-details.service.js';
 import { TaskDispatchService } from './task-dispatch.service.js';
 import { FakeTaskNoticeSender, TaskNoticeSender } from './task-notice-sender.js';
@@ -29,6 +30,7 @@ import { TasksService } from './tasks.service.js';
   providers: [
     DesignersService,
     TaskAccessService,
+    TaskChecksService,
     TaskDetailsService,
     TaskDispatchService,
     TasksService,
@@ -45,6 +47,7 @@ import { TasksService } from './tasks.service.js';
   exports: [
     DesignersService,
     TaskAccessService,
+    TaskChecksService,
     TasksService,
     TaskDispatchService,
     TaskNoticeSender,

@@ -5,6 +5,8 @@ export interface NoticeTask {
   requirement: string;
 }
 
+export type NoticeEndReason = 'taken' | 'cancelled';
+
 export interface NoticeDesigner {
   id: string;
   telegramChatId: string | null;
@@ -20,8 +22,12 @@ export abstract class TaskNoticeSender {
     task: NoticeTask,
     noticeId: string,
   ): Promise<string | null>;
-  /** Tells the designers who did not get the task. */
-  abstract markTaken(task: NoticeTask, notices: { id: string }[]): Promise<void>;
+  /** Tells the designers who were offered the task that it is no longer open. */
+  abstract markTaken(
+    task: NoticeTask,
+    notices: { id: string }[],
+    reason?: NoticeEndReason,
+  ): Promise<void>;
   /** Tells the task's designer that the customer did something in the chat. */
   abstract messageWaiting(designer: NoticeDesigner, task: { id: string }): Promise<void>;
 }
@@ -38,8 +44,8 @@ export class FakeTaskNoticeSender extends TaskNoticeSender {
     return null;
   }
 
-  async markTaken(task: NoticeTask, notices: unknown[]) {
-    this.logger.log(`Task ${task.id} taken; ${notices.length} other notices to update`);
+  async markTaken(task: NoticeTask, notices: unknown[], reason: NoticeEndReason = 'taken') {
+    this.logger.log(`Task ${task.id} ${reason}; ${notices.length} notices to update`);
   }
 
   async messageWaiting(designer: NoticeDesigner, task: { id: string }) {

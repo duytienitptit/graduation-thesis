@@ -3,7 +3,7 @@
 import { FormEvent, useRef, useState } from 'react';
 import { ErrorNote } from '@/components/error-note';
 import { Button } from '@/components/ui/button';
-import { ApiError, finishTask, sendFinal, TaskDetail, uploadChatImage } from '@/lib/api';
+import { ApiError, closeTask, finishTask, sendFinal, TaskDetail, uploadChatImage } from '@/lib/api';
 
 const FAILURES: Record<string, string> = {
   'not-agreed': 'Khách chưa đồng ý mẫu nào, hoặc bạn vừa gửi mẫu mới.',
@@ -60,12 +60,32 @@ export function TaskFinish({ task, reload }: { task: TaskDetail; reload: () => P
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const agreed = !!task.agreedVersionId;
+  const [closeReason, setCloseReason] = useState('');
+  const [closing, setClosing] = useState(false);
+
+  // A view task's image is approved at the views step, so it needs no "Agree" or back.
+  const viewTask = !!task.targetView;
+  const agreed = viewTask || !!task.agreedVersionId;
   const hasFinal = !!task.finalVersionId;
+  const backMissing = !viewTask && !back && !description.trim();
+
+  async function close() {
+    setBusy(true);
+    setError(null);
+    try {
+      await closeTask(task.id, closeReason);
+      await reload();
+    } catch (e) {
+      setError(failureText(e));
+      setClosing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!main || (!back && !description.trim())) return;
+    if (!main || backMissing) return;
 
     setBusy(true);
     setError(null);
@@ -105,7 +125,7 @@ export function TaskFinish({ task, reload }: { task: TaskDetail; reload: () => P
 
   return (
     <section aria-label="Hoàn thành task" className="mt-8 border-t border-mist pt-6">
-      <h2 className="font-semibold">Bản cuối</h2>
+      <h2 className="font-semibold">{viewTask ? `Ảnh ${task.targetView!.label}` : 'Bản cuối'}</h2>
 
       {!agreed && (
         <p className="mt-2 text-muted-foreground" data-testid="final-hint">
@@ -123,37 +143,41 @@ export function TaskFinish({ task, reload }: { task: TaskDetail; reload: () => P
             </p>
           )}
           <ImagePick
-            label="Ảnh chính (mặt trước)"
+            label={viewTask ? `Ảnh ${task.targetView!.label}` : 'Ảnh chính (mặt trước)'}
             testId="final-image"
             file={main}
             onPick={setMain}
           />
-          <label htmlFor="back-description" className="mt-4 block font-medium">
-            Mô tả mặt sau
-          </label>
-          <p className="text-sm text-muted-foreground">
-            Bắt buộc có mô tả hoặc ảnh mặt sau, vì AI cần biết mặt sau để tạo góc này.
-          </p>
-          <textarea
-            id="back-description"
-            rows={3}
-            maxLength={2000}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            className="mt-2 block w-full border border-mist bg-white px-3 py-2 outline-none focus-visible:border-cobalt focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-          <ImagePick
-            label="Ảnh mặt sau"
-            testId="final-back-image"
-            file={back}
-            onPick={setBack}
-          />
+          {!viewTask && (
+            <>
+              <label htmlFor="back-description" className="mt-4 block font-medium">
+                Mô tả mặt sau
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Bắt buộc có mô tả hoặc ảnh mặt sau, vì AI cần biết mặt sau để tạo góc này.
+              </p>
+              <textarea
+                id="back-description"
+                rows={3}
+                maxLength={2000}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                className="mt-2 block w-full border border-mist bg-white px-3 py-2 outline-none focus-visible:border-cobalt focus-visible:ring-3 focus-visible:ring-ring/50"
+              />
+              <ImagePick
+                label="Ảnh mặt sau"
+                testId="final-back-image"
+                file={back}
+                onPick={setBack}
+              />
+            </>
+          )}
           <Button
             type="submit"
             size="lg"
             variant={hasFinal ? 'outline' : 'default'}
             className="mt-4"
-            disabled={busy || !main || (!back && !description.trim())}
+            disabled={busy || !main || backMissing}
           >
             {hasFinal ? 'Gửi lại bản cuối' : 'Gửi bản cuối'}
           </Button>
@@ -163,7 +187,11 @@ export function TaskFinish({ task, reload }: { task: TaskDetail; reload: () => P
       <div className="mt-8">
         {confirming ? (
           <>
-            <p>Sau khi hoàn thành, chat sẽ đóng và hệ thống tạo các góc còn lại từ bản cuối.</p>
+            <p>
+              {viewTask
+                ? 'Sau khi hoàn thành, chat sẽ đóng và ảnh vào góc này để khách duyệt.'
+                : 'Sau khi hoàn thành, chat sẽ đóng và hệ thống tạo các góc còn lại từ bản cuối.'}
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="lg" disabled={busy} onClick={() => void done()}>
                 Xác nhận hoàn thành
@@ -180,12 +208,51 @@ export function TaskFinish({ task, reload }: { task: TaskDetail; reload: () => P
             </Button>
             {(!agreed || !hasFinal) && (
               <p className="mt-2 text-sm text-muted-foreground">
-                Cần khách đồng ý một mẫu và bạn đã gửi bản cuối.
+                {viewTask
+                  ? 'Cần gửi ảnh góc trước.'
+                  : 'Cần khách đồng ý một mẫu và bạn đã gửi bản cuối.'}
               </p>
             )}
           </>
         )}
       </div>
+
+      <details className="mt-10 border-t border-mist pt-4" data-testid="close-task">
+        <summary className="cursor-pointer font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+          Khách không phản hồi? Đóng task
+        </summary>
+        <label htmlFor="close-reason" className="mt-3 block font-medium">
+          Lý do đóng
+        </label>
+        <p className="text-sm text-muted-foreground">Khách và quản lí sẽ thấy lý do này.</p>
+        <textarea
+          id="close-reason"
+          rows={2}
+          maxLength={1000}
+          value={closeReason}
+          onChange={(event) => setCloseReason(event.target.value)}
+          className="mt-2 block w-full max-w-lg border border-mist bg-white px-3 py-2 outline-none focus-visible:border-cobalt focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+        {closing ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="destructive" disabled={busy} onClick={() => void close()}>
+              Xác nhận đóng task
+            </Button>
+            <Button variant="outline" onClick={() => setClosing(false)}>
+              Xem lại
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            className="mt-3"
+            disabled={!closeReason.trim()}
+            onClick={() => setClosing(true)}
+          >
+            Đóng task
+          </Button>
+        )}
+      </details>
     </section>
   );
 }

@@ -41,9 +41,18 @@ function TaskRow({ task }: { task: DesignerTaskRow }) {
       className="group block py-3 outline-none hover:bg-white focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <span className="flex items-baseline justify-between gap-4">
-        <span className="font-medium group-hover:text-cobalt">{task.productName}</span>
+        <span className="font-medium group-hover:text-cobalt">
+          {task.productName}
+          {task.viewLabel && (
+            <span className="font-normal text-muted-foreground">, chỉ {task.viewLabel}</span>
+          )}
+        </span>
         <span className="text-sm text-muted-foreground">
-          {task.status === 'DONE' ? doneDate(task.doneAt) : `Khách: ${task.customerName}`}
+          {task.status === 'DONE'
+            ? doneDate(task.doneAt)
+            : task.status === 'CLOSED'
+              ? `Đã đóng ${doneDate(task.closedAt)}`
+              : `Khách: ${task.customerName}`}
         </span>
       </span>
       <span className="mt-1 line-clamp-2 text-sm text-muted-foreground">{task.requirement}</span>

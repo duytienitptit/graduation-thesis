@@ -17,7 +17,7 @@ import { FilesPort } from '../integrations/files/files.port.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { TaskAccessService } from '../task/task-access.service.js';
 import { TaskDispatchService } from '../task/task-dispatch.service.js';
-import { TasksService } from '../task/tasks.service.js';
+import { lockSession, OPEN_TASK_STATUSES, TasksService } from '../task/tasks.service.js';
 import { Answers, uploadedFileIds } from './answers.js';
 import { DesignSessionService, SpecSnapshot } from './design-session.service.js';
 import { buildBackPrompt, buildCloseUpPrompt, buildExtraViewPrompt } from './prompt-builder.js';
@@ -85,14 +85,15 @@ export class DesignViewsService {
    */
   async finishTask(designer: AuthUser, taskId: string) {
     const task = await this.access.openAs(designer, taskId, 'DESIGNER');
+    const viewTask = task.targetViewId !== null;
 
     const { views, finished } = await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.task.updateMany({
         where: {
           id: taskId,
           status: 'ASSIGNED',
-          agreedVersionId: { not: null },
           finalVersionId: { not: null },
+          ...(viewTask ? {} : { agreedVersionId: { not: null } }),
         },
         data: { status: 'DONE', doneAt: this.clock.now() },
       });
@@ -103,6 +104,16 @@ export class DesignViewsService {
         where: { id: task.designerId!, state: 'BUSY' },
         data: { state: 'FREE' },
       });
+
+      if (viewTask) {
+        // The customer approves the designer's image like any other.
+        const finished = await tx.task.findUniqueOrThrow({ where: { id: taskId } });
+        await tx.productView.updateMany({
+          where: { id: task.targetViewId!, status: { not: 'APPROVED' } },
+          data: { versionId: finished.finalVersionId, status: 'READY' },
+        });
+        return { views: [], finished };
+      }
 
       const moved = await tx.designSession.updateMany({
         where: { id: task.sessionId, status: 'DESIGNER' },
@@ -192,10 +203,16 @@ export class DesignViewsService {
     await this.changeableSession(customer, sessionId);
 
     return this.prisma.$transaction(async (tx) => {
+      await lockSession(tx, sessionId);
       const active = await tx.aiJob.count({
         where: { sessionId, status: { in: ['QUEUED', 'RUNNING'] } },
       });
       if (active) throw new ConflictException('An image is still being created');
+
+      const withDesigner = await tx.task.count({
+        where: { sessionId, targetViewId: { not: null }, status: { in: [...OPEN_TASK_STATUSES] } },
+      });
+      if (withDesigner) throw new ConflictException({ code: 'view-with-designer' });
 
       const approved = await tx.productView.count({
         where: { sessionId, type: { in: [...REQUIRED_VIEWS] }, status: 'APPROVED' },
@@ -289,6 +306,10 @@ export class DesignViewsService {
     const session = await this.changeableSession(customer, sessionId);
     const view = await this.prisma.productView.findFirst({ where: { id: viewId, sessionId } });
     if (!view) throw new NotFoundException('View not found');
+    const withDesigner = await this.prisma.task.count({
+      where: { targetViewId: viewId, status: { in: [...OPEN_TASK_STATUSES] } },
+    });
+    if (withDesigner) throw new ConflictException({ code: 'view-with-designer' });
     return { session, view };
   }
 

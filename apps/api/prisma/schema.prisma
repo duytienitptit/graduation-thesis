@@ -191,6 +191,7 @@ model ProductView {
   updatedAt   DateTime          @updatedAt
 
   aiJobs AiJob[]
+  tasks  Task[]
 
   @@unique([sessionId, type, position])
 }
@@ -231,6 +232,10 @@ enum TaskStatus {
   WAITING
   ASSIGNED
   DONE
+  /// The customer cancelled a task nobody took within 48 hours.
+  CANCELLED
+  /// The designer closed it, usually because the customer went silent.
+  CLOSED
 }
 
 model Task {
@@ -262,12 +267,23 @@ model Task {
   doneAt             DateTime?
   /// Limits Telegram notices about customer messages.
   lastChatNoticeAt   DateTime?
+  /// Set for a task about one view at the views step; its final replaces that view's image.
+  targetViewId       String?
+  targetView         ProductView?     @relation(fields: [targetViewId], references: [id])
+  /// When the customer was told that nobody has taken the task yet. Sent once.
+  noTakerNoticeAt    DateTime?
+  /// When managers were alerted that the designer went silent. Cleared when the designer writes.
+  silenceAlertAt     DateTime?
+  cancelledAt        DateTime?
+  closedAt           DateTime?
+  closeReason        String?
 
   notices  TaskNotice[]
   messages TaskMessage[]
 
   @@index([status, createdAt])
   @@index([sessionId])
+  @@index([targetViewId])
 }
 
 enum TaskMessageKind {

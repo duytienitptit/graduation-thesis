@@ -4,6 +4,7 @@ import type { SpecSnapshot } from '../design/design-session.service.js';
 import { QUESTION_SETS } from '../design/question-sets.js';
 import { AuthUser } from '../integrations/auth/auth.port.js';
 import { FilesPort } from '../integrations/files/files.port.js';
+import { viewLabel } from '../telegram/task-summary.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DesignersService } from './designers.service.js';
 import { TaskAccessService } from './task-access.service.js';
@@ -23,7 +24,7 @@ export class TaskDetailsService {
     const tasks = await this.prisma.task.findMany({
       where: { designerId: designer.id },
       orderBy: { assignedAt: 'desc' },
-      include: { session: true, customer: { select: { name: true } } },
+      include: { session: true, customer: { select: { name: true } }, targetView: true },
     });
 
     const rows = tasks.map((task) => ({
@@ -34,10 +35,12 @@ export class TaskDetailsService {
       customerName: task.customer.name,
       assignedAt: task.assignedAt,
       doneAt: task.doneAt,
+      closedAt: task.closedAt,
+      viewLabel: task.targetView ? viewLabel(task.targetView) : null,
     }));
     return {
       current: rows.find((row) => row.status === 'ASSIGNED') ?? null,
-      past: rows.filter((row) => row.status === 'DONE'),
+      past: rows.filter((row) => row.status === 'DONE' || row.status === 'CLOSED'),
     };
   }
 
@@ -51,6 +54,7 @@ export class TaskDetailsService {
         designer: { include: { user: { select: { name: true } } } },
         referenceVersion: { select: { fileId: true } },
         finalVersion: { select: { fileId: true } },
+        targetView: true,
       },
     });
 
@@ -69,6 +73,13 @@ export class TaskDetailsService {
       designerName: task.designer?.user.name ?? null,
       assignedAt: task.assignedAt,
       doneAt: task.doneAt,
+      closedAt: task.closedAt,
+      cancelledAt: task.cancelledAt,
+      closeReason: task.closeReason,
+      silenceAlertAt: task.silenceAlertAt,
+      targetView: task.targetView
+        ? { type: task.targetView.type, label: viewLabel(task.targetView) }
+        : null,
       product: {
         name: specs.product.name,
         colour: specs.colour.name,

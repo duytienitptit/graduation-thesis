@@ -18,6 +18,20 @@ import { DesignersService } from './designers.service.js';
 import { TaskDetailsService } from './task-details.service.js';
 import { TasksService } from './tasks.service.js';
 
+class RequirementDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  requirement!: string;
+}
+
+class CloseTaskDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  reason!: string;
+}
+
 class CreateTaskDto {
   @IsUUID()
   versionId!: string;
@@ -35,6 +49,35 @@ export class TasksController {
     private readonly designers: DesignersService,
     private readonly details: TaskDetailsService,
   ) {}
+
+  @Roles(Role.CUSTOMER)
+  @Post('design/sessions/:id/views/:viewId/tasks')
+  createForView(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('viewId', ParseUUIDPipe) viewId: string,
+    @Body() body: RequirementDto,
+  ) {
+    return this.tasks.createForView(user, id, viewId, body.requirement);
+  }
+
+  @Roles(Role.CUSTOMER)
+  @Post('tasks/:id/cancel')
+  @HttpCode(204)
+  cancel(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.tasks.cancel(user, id);
+  }
+
+  @Roles(Role.DESIGNER)
+  @Post('tasks/:id/close')
+  @HttpCode(204)
+  close(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CloseTaskDto,
+  ) {
+    return this.tasks.close(user, id, body.reason);
+  }
 
   @Get('tasks/:id')
   detail(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {

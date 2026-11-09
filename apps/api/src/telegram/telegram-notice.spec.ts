@@ -179,6 +179,17 @@ describe('Telegram notices', () => {
     expect(replaced[0]).toMatchObject({ messageId: 777, text: MESSAGES.takenNotice });
   });
 
+  it('changes a sent message to say the customer cancelled', async () => {
+    const created = await notice();
+    await prisma.taskNotice.update({ where: { id: created.id }, data: { externalId: '55' } });
+    await processor.process({
+      name: 'mark-taken',
+      data: { noticeId: created.id, reason: 'cancelled' },
+      attemptsMade: 0,
+    } as Job);
+    expect(replaced.at(-1)).toMatchObject({ messageId: 55, text: MESSAGES.cancelledNotice });
+  });
+
   it('has nothing to change when the message was never sent', async () => {
     const row = await notice();
     await markTaken(row.id);
@@ -243,7 +254,10 @@ describe('QueuedTelegramSender', () => {
       addBulk: async (items: { name: string; data: unknown }[]) => bulk.push(items),
     } as never);
     await taken.markTaken({ id: 't', requirement: 'x' }, [{ id: 'n1' }, { id: 'n2' }]);
-    expect(bulk[0].map((item) => item.data)).toEqual([{ noticeId: 'n1' }, { noticeId: 'n2' }]);
+    expect(bulk[0].map((item) => item.data)).toEqual([
+      { noticeId: 'n1', reason: 'taken' },
+      { noticeId: 'n2', reason: 'taken' },
+    ]);
     expect(bulk[0][0].name).toBe('mark-taken');
   });
 });

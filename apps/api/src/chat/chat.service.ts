@@ -80,6 +80,7 @@ export class ChatService {
 
     const presented = await this.publish(task, message);
     if (side === 'CUSTOMER') await this.tellDesigner(task);
+    else await this.clearSilence(task.id);
     return presented;
   }
 
@@ -124,6 +125,7 @@ export class ChatService {
     });
 
     const presented = await this.publish(task, message);
+    await this.clearSilence(task.id);
     this.tasks.announce(task);
     return presented;
   }
@@ -155,12 +157,16 @@ export class ChatService {
     await this.tellDesigner(task);
   }
 
-  /** Can be sent again until "Done"; the newest counts. */
+  /**
+   * Can be sent again until "Done"; the newest counts. A view task's final is the view
+   * itself, so it needs neither "Agree" nor back content.
+   */
   async sendFinal(user: AuthUser, taskId: string, input: FinalInput) {
     const task = await this.access.openAs(user, taskId, 'DESIGNER');
-    const backDescription = input.backDescription?.trim() || null;
-    const backFileId = input.backFileId ?? null;
-    if (!backDescription && !backFileId) {
+    const viewTask = task.targetViewId !== null;
+    const backDescription = viewTask ? null : input.backDescription?.trim() || null;
+    const backFileId = viewTask ? null : (input.backFileId ?? null);
+    if (!viewTask && !backDescription && !backFileId) {
       throw new BadRequestException({ code: 'back-required' });
     }
     await this.assertOwned(user, [input.fileId, ...(backFileId ? [backFileId] : [])]);
@@ -176,7 +182,11 @@ export class ChatService {
         },
       });
       const { count } = await tx.task.updateMany({
-        where: { id: taskId, status: 'ASSIGNED', agreedVersionId: { not: null } },
+        where: {
+          id: taskId,
+          status: 'ASSIGNED',
+          ...(viewTask ? {} : { agreedVersionId: { not: null } }),
+        },
         data: { finalVersionId: version.id, backDescription, backFileId },
       });
       if (!count) throw new ConflictException({ code: 'not-agreed' });
@@ -196,8 +206,17 @@ export class ChatService {
     });
 
     const presented = await this.publish(task, message);
+    await this.clearSilence(task.id);
     this.tasks.announce(task);
     return presented;
+  }
+
+  /** The designer answered, so a past silence alert no longer holds. */
+  private async clearSilence(taskId: string) {
+    await this.prisma.task.updateMany({
+      where: { id: taskId, silenceAlertAt: { not: null } },
+      data: { silenceAlertAt: null },
+    });
   }
 
   private assertOpen(task: ChatTask) {

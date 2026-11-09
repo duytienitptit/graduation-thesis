@@ -1,5 +1,10 @@
 import { Queue } from 'bullmq';
-import { NoticeDesigner, NoticeTask, TaskNoticeSender } from './task-notice-sender.js';
+import {
+  NoticeDesigner,
+  NoticeEndReason,
+  NoticeTask,
+  TaskNoticeSender,
+} from './task-notice-sender.js';
 
 export const NOTICE_QUEUE = 'telegram-notices';
 export const NOTICE_JOB_ATTEMPTS = 5;
@@ -29,11 +34,15 @@ export class QueuedTelegramSender extends TaskNoticeSender {
     return null;
   }
 
-  async markTaken(_task: NoticeTask, notices: { id: string }[]) {
+  async markTaken(
+    _task: NoticeTask,
+    notices: { id: string }[],
+    reason: NoticeEndReason = 'taken',
+  ) {
     await this.queue.addBulk(
       notices.map(({ id }) => ({
         name: MARK_TAKEN_JOB,
-        data: { noticeId: id },
+        data: { noticeId: id, reason },
         opts: JOB_OPTIONS,
       })),
     );

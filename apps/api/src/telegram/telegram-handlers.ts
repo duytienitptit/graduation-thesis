@@ -12,6 +12,7 @@ export const MESSAGES = {
   designerBusy: 'Bạn đang làm một task khác hoặc đang tạm dừng, nên chưa nhận được task này.',
   notLinked: 'Tài khoản Telegram này chưa liên kết với designer nào.',
   takenNotice: 'Task này đã có người nhận.',
+  cancelledNotice: 'Khách đã hủy task này.',
   openTask: 'Mở trang task để chat với khách:',
   chatNotice: 'Khách vừa có phản hồi trong task của bạn.',
 };

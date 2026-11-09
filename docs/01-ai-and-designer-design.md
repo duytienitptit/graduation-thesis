@@ -147,6 +147,7 @@ The wording is a draft that the project owner reviewed, removing the "other spor
 - On a printed shirt with no logo, the close-up shows the main print.
 - Extra views are chosen by typing what to show, at most 2 per product, and each counts against the daily limit.
 - Choosing a designer at the angle step creates a new task with the main image as reference and the angle named. The old task is not reopened.
+- Such a view task works for any unapproved view except the front. It skips "Agree" and the back content: the designer sends the view's image and presses "Done", and the customer approves that view as usual. Other views stay usable, and the product cannot be locked while the view task is open (owner's choice, 2026-11-09).
 
 ## 7. Designer branch
 
@@ -207,6 +208,13 @@ Owner's choices (2026-11-06):
 - If a task closes because the customer went silent, the customer can return to the design session and create a new task.
 - When the manager returns or cancels a task, that designer goes to Free.
 - Besides Free and Busy, the manager can set a designer to **Paused** so they receive no messages, for leave or repeated silence.
+
+Owner's choices (2026-11-09):
+- The "nobody took it" notice after 2 working hours shows on the customer's design page. The customer has no other channel.
+- After the customer cancels or the designer closes a task, the session returns to AI editing, and the customer can also create a new task.
+- Designer silence counts 24 hours straight while it is the designer's turn: from the claim if the designer has written nothing, or from the customer's oldest unanswered message or "Agree".
+- The designer can close a task at any time with a required reason, which the customer and the manager see.
+- Checks run every 10 minutes, so these notices can be up to about 10 minutes late.
 
 ## 8. Manager
 

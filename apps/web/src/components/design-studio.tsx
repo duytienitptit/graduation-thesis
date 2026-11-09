@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import { ErrorNote } from '@/components/error-note';
 import { ProductViews } from '@/components/product-views';
 import { TaskChatPanel } from '@/components/task-chat';
+import { TaskWaiting } from '@/components/task-waiting';
 import { Button } from '@/components/ui/button';
 import {
   ApiError,
@@ -30,19 +31,24 @@ const resetTime = (iso: string) =>
     month: '2-digit',
   }).format(new Date(iso));
 
-const WAIT_NOTES: Record<NonNullable<DesignTask['waitReason']>, string> = {
-  'out-of-hours': 'Hiện ngoài giờ làm việc. Yêu cầu của bạn sẽ được gửi lúc 9:00.',
-  'no-free-designer': 'Hiện chưa có designer rảnh. Yêu cầu sẽ được gửi ngay khi có người rảnh.',
-};
-
-function TaskPanel({ task }: { task: DesignTask }) {
+/** A designer task that ended without a result: what happened, and the chat to look back at. */
+function EndedTask({ task }: { task: DesignTask }) {
   return (
-    <div data-testid="task-panel">
-      <h2 className="overprint text-3xl font-extrabold">Đang tìm designer…</h2>
-      <p className="mt-3 text-muted-foreground">Designer làm việc từ 9:00 đến 17:00 mỗi ngày.</p>
-      {task.waitReason && <p className="mt-2">{WAIT_NOTES[task.waitReason]}</p>}
-      <p className="mt-6 text-sm font-semibold">Yêu cầu của bạn</p>
-      <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{task.requirement}</p>
+    <div className="mb-6 border-l-4 border-magenta pl-3" data-testid="task-ended">
+      <p role="status">
+        {task.status === 'CLOSED'
+          ? `Designer đã đóng yêu cầu với lý do: "${task.closeReason}".`
+          : 'Bạn đã hủy yêu cầu designer.'}{' '}
+        Bạn có thể sửa tiếp bằng AI hoặc nhờ designer lần nữa.
+      </p>
+      {task.status === 'CLOSED' && (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+            Xem lại chat với designer
+          </summary>
+          <TaskChatPanel taskId={task.id} />
+        </details>
+      )}
     </div>
   );
 }
@@ -114,7 +120,11 @@ export function DesignStudio({ sessionId, hasLogo, logoPosition }: StudioProps) 
   async function submitTask(event: FormEvent) {
     event.preventDefault();
     if (!selectedId || !requirement.trim()) return;
-    await run(() => createTask(sessionId, selectedId, requirement));
+    if (await run(() => createTask(sessionId, selectedId, requirement))) {
+      // The form must not come back open if the session later returns to AI editing.
+      setAskingDesigner(false);
+      setRequirement('');
+    }
   }
 
   async function submitEdit(event: FormEvent) {
@@ -195,8 +205,12 @@ export function DesignStudio({ sessionId, hasLogo, logoPosition }: StudioProps) 
 
         <div>
           {workspace.status === 'DESIGNER' && workspace.task && (
-            <TaskPanel task={workspace.task} />
+            <TaskWaiting task={workspace.task} onChange={reload} />
           )}
+          {canWork &&
+            (workspace.task?.status === 'CLOSED' || workspace.task?.status === 'CANCELLED') && (
+              <EndedTask task={workspace.task} />
+            )}
 
           {failed && workspace.status !== 'DESIGNER' && (
             <ErrorNote>

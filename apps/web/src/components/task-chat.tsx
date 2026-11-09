@@ -59,7 +59,9 @@ interface BubbleProps {
 function Bubble({ message, task, busy, onAgree }: BubbleProps) {
   const own = message.senderRole === task.side;
   const agreed = !!message.versionId && message.versionId === task.agreedVersionId;
-  const canAgree = task.side === 'CUSTOMER' && task.status === 'ASSIGNED' && !agreed;
+  // A view task is approved at the views step instead.
+  const canAgree =
+    task.side === 'CUSTOMER' && task.status === 'ASSIGNED' && !agreed && !task.targetView;
   const final = message.kind === 'FINAL';
   const current = final && message.versionId === task.finalVersionId;
 
@@ -289,7 +291,13 @@ export function TaskChat({ room }: { room: TaskRoom }) {
           </div>
         </form>
       ) : (
-        <p className="mt-3 text-sm text-muted-foreground">Chat đã đóng vì task đã hoàn thành.</p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {task.status === 'CLOSED'
+            ? 'Chat đã đóng vì designer đã đóng task.'
+            : task.status === 'ASSIGNED'
+              ? 'Bạn chỉ xem được chat này.'
+              : 'Chat đã đóng vì task đã hoàn thành.'}
+        </p>
       )}
     </div>
   );
@@ -303,7 +311,12 @@ export function TaskChatPanel({ taskId, withBrief }: { taskId: string; withBrief
   const chat = (
     <div>
       {error && <ErrorNote>{error.message}</ErrorNote>}
-      {task?.status === 'ASSIGNED' && task.agreedVersionId && (
+      {task?.status === 'ASSIGNED' && task.targetView && task.finalVersionId && (
+        <p role="status" className="mb-3 border-l-4 border-cobalt pl-3 text-sm">
+          Designer đã gửi ảnh góc này. Khi designer bấm hoàn thành, ảnh sẽ vào góc để bạn duyệt.
+        </p>
+      )}
+      {task?.status === 'ASSIGNED' && !task.targetView && task.agreedVersionId && (
         <p role="status" className="mb-3 border-l-4 border-cobalt pl-3 text-sm">
           {task.finalVersionId
             ? 'Designer đã gửi bản cuối. Khi designer bấm hoàn thành, hệ thống sẽ tạo các góc còn lại.'

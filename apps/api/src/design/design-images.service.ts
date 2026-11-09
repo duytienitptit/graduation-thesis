@@ -98,6 +98,7 @@ export class DesignImagesService {
       this.prisma.lockedProduct.findUnique({ where: { sessionId }, select: { id: true } }),
       this.tasks.forSession(sessionId),
     ]);
+    const viewTasks = await this.tasks.forViews(sessionId);
 
     return {
       status: session.status,
@@ -124,6 +125,7 @@ export class DesignImagesService {
           description: view.description,
           versionId: view.versionId,
           jobStatus: view.aiJobs[0]?.status ?? null,
+          task: viewTasks[view.id] ?? null,
           imageUrl: view.version
             ? (await this.files.getLink(view.version.fileId)).url
             : null,
