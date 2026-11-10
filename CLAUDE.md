@@ -33,7 +33,8 @@ Planned stack: Next.js, NestJS, PostgreSQL with Prisma, Redis with BullMQ, Socke
 
 - `docs/01-ai-and-designer-design.md` is the design for this owner's scope. It is approved, and it wins over the overview where they differ.
 - `docs/02-implementation-plan.md` is the build order, with status per phase.
-- `docs/03-team-integration.md` is the hand-over for Persons 1 and 2, in Vietnamese: interfaces to replace, routes, events and open contract questions.
+- `docs/03-team-integration.md` is the integration guide for Persons 1 and 2 and their AI assistants: interfaces to replace, routes, events, invariants and open contract questions.
+- `docs/04-team-overview-diagrams.md` explains the same part to people, in Vietnamese, with Mermaid diagrams.
 - `docs/00-project-overview.md` covers the whole system. Its sections 5 and 6 show the original assignment, which has since changed.
 - `docs/diagrams/` holds the Mermaid source diagrams and the overview picture, which has Vietnamese labels. 
 
